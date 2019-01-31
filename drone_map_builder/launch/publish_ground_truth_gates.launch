@@ -1,0 +1,7 @@
+<launch>
+
+    <node pkg="drone_map_builder" type="gt_gates_publisher_node.py" name="gt_gates_publisher_node" output="screen">
+        <param name="path_to_gates_file" value="$(find drone_map_builder)/configs/test_track_gates.json"/>
+    </node>
+
+</launch>
