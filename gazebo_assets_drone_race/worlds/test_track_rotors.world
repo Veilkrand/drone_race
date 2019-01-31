@@ -1,0 +1,867 @@
+<sdf version='1.6'>
+  <world name='default'>
+  
+   <!-- Only one ROS interface plugin is required per world, as any other plugin can connect a Gazebo
+         topic to a ROS topic (or vise versa). -->
+    <plugin name="ros_interface_plugin" filename="librotors_gazebo_ros_interface_plugin.so"/>
+  
+    <light name='sun' type='directional'>
+      <cast_shadows>1</cast_shadows>
+      <pose frame=''>0 0 10 0 -0 0</pose>
+      <diffuse>0.8 0.8 0.8 1</diffuse>
+      <specular>0.1 0.1 0.1 1</specular>
+      <attenuation>
+        <range>1000</range>
+        <constant>0.9</constant>
+        <linear>0.01</linear>
+        <quadratic>0.001</quadratic>
+      </attenuation>
+      <direction>-0.5 0.5 -1</direction>
+    </light>
+    <model name='ground_plane'>
+      <static>1</static>
+      <link name='link'>
+        <collision name='collision'>
+          <geometry>
+            <plane>
+              <normal>0 0 1</normal>
+              <size>100 100</size>
+            </plane>
+          </geometry>
+          <surface>
+            <friction>
+              <ode>
+                <mu>100</mu>
+                <mu2>50</mu2>
+              </ode>
+              <torsional>
+                <ode/>
+              </torsional>
+            </friction>
+            <contact>
+              <ode/>
+            </contact>
+            <bounce/>
+          </surface>
+          <max_contacts>10</max_contacts>
+        </collision>
+        <visual name='visual'>
+          <cast_shadows>0</cast_shadows>
+          <geometry>
+            <plane>
+              <normal>0 0 1</normal>
+              <size>100 100</size>
+            </plane>
+          </geometry>
+          <material>
+            <script>
+              <uri>file://media/materials/scripts/gazebo.material</uri>
+              <name>Gazebo/Grey</name>
+            </script>
+          </material>
+        </visual>
+        <self_collide>0</self_collide>
+        <kinematic>0</kinematic>
+        <gravity>1</gravity>
+      </link>
+    </model>
+    <model name='asphalt_plane'>
+      <static>1</static>
+      <link name='link'>
+        <collision name='collision'>
+          <geometry>
+            <box>
+              <size>20 20 0.1</size>
+            </box>
+          </geometry>
+          <max_contacts>10</max_contacts>
+          <surface>
+            <contact>
+              <ode/>
+            </contact>
+            <bounce/>
+            <friction>
+              <torsional>
+                <ode/>
+              </torsional>
+              <ode/>
+            </friction>
+          </surface>
+        </collision>
+        <visual name='visual'>
+          <cast_shadows>0</cast_shadows>
+          <geometry>
+            <box>
+              <size>20 20 0.1</size>
+            </box>
+          </geometry>
+          <material>
+            <script>
+              <uri>model://asphalt_plane/materials/scripts</uri>
+              <uri>model://asphalt_plane/materials/textures</uri>
+              <name>vrc/asphalt</name>
+            </script>
+          </material>
+        </visual>
+        <self_collide>0</self_collide>
+        <kinematic>0</kinematic>
+        <gravity>1</gravity>
+      </link>
+    </model>
+    <physics name='default_physics' default='0' type='ode'>
+      <ode>
+        <solver>
+          <type>quick</type>
+          <iters>10</iters>
+          <sor>1.3</sor>
+          <use_dynamic_moi_rescaling>0</use_dynamic_moi_rescaling>
+        </solver>
+        <constraints>
+          <cfm>0</cfm>
+          <erp>0.2</erp>
+          <contact_max_correcting_vel>100</contact_max_correcting_vel>
+          <contact_surface_layer>0.001</contact_surface_layer>
+        </constraints>
+      </ode>
+      <max_step_size>0.004</max_step_size>
+      <real_time_factor>1</real_time_factor>
+      <real_time_update_rate>250</real_time_update_rate>
+    </physics>
+    <gravity>0 0 -9.8066</gravity>
+    <magnetic_field>6e-06 2.3e-05 -4.2e-05</magnetic_field>
+    <atmosphere type='adiabatic'/>
+    <scene>
+      <ambient>0.4 0.4 0.4 1</ambient>
+      <background>0.7 0.7 0.7 1</background>
+      <shadows>1</shadows>
+    </scene>
+    <spherical_coordinates>
+      <surface_model>EARTH_WGS84</surface_model>
+      <latitude_deg>0</latitude_deg>
+      <longitude_deg>0</longitude_deg>
+      <elevation>0</elevation>
+      <heading_deg>0</heading_deg>
+    </spherical_coordinates>
+    <state world_name='default'>
+      <sim_time>0 0</sim_time>
+      <real_time>0 0</real_time>
+      <wall_time>1544441347 216287536</wall_time>
+      <iterations>0</iterations>
+      <model name='aruco_4x4_10_0'>
+        <pose frame=''>-3.43295 1.13137 1.17771 0 -0 0</pose>
+        <scale>1 1 1</scale>
+        <link name='link'>
+          <pose frame=''>-3.43295 1.13137 1.17771 0 -0 0</pose>
+          <velocity>0 0 0 0 -0 0</velocity>
+          <acceleration>0 0 0 0 -0 0</acceleration>
+          <wrench>0 0 0 0 -0 0</wrench>
+        </link>
+      </model>
+      <model name='aruco_4x4_10_1'>
+        <pose frame=''>-8.00466 1.05556 2.19768 0 -0 1.04754</pose>
+        <scale>1 1 1</scale>
+        <link name='link'>
+          <pose frame=''>-8.00466 1.05556 2.19768 0 -0 1.04754</pose>
+          <velocity>0 0 0 0 -0 0</velocity>
+          <acceleration>0 0 0 0 -0 0</acceleration>
+          <wrench>0 0 0 0 -0 0</wrench>
+        </link>
+      </model>
+      <model name='aruco_4x4_10_2'>
+        <pose frame=''>-8.86541 -3.8308 2.72565 0 -0 1.59136</pose>
+        <scale>1 1 1</scale>
+        <link name='link'>
+          <pose frame=''>-8.86541 -3.8308 2.72565 0 -0 1.59136</pose>
+          <velocity>0 0 0 0 -0 0</velocity>
+          <acceleration>0 0 0 0 -0 0</acceleration>
+          <wrench>0 0 0 0 -0 0</wrench>
+        </link>
+      </model>
+      <model name='aruco_4x4_10_3'>
+        <pose frame=''>-6.41389 -7.30975 2.77515 0 -0 2.52009</pose>
+        <scale>1 1 1</scale>
+        <link name='link'>
+          <pose frame=''>-6.41389 -7.30975 2.77515 0 -0 2.52009</pose>
+          <velocity>0 0 0 0 -0 0</velocity>
+          <acceleration>0 0 0 0 -0 0</acceleration>
+          <wrench>0 0 0 0 -0 0</wrench>
+        </link>
+      </model>
+      <model name='aruco_4x4_10_4_clone'>
+        <pose frame=''>-0.679768 -6.62442 0.404311 0 0 -3.1392</pose>
+        <scale>1 1 1</scale>
+        <link name='link'>
+          <pose frame=''>-0.679768 -6.62442 0.404311 0 0 -3.1392</pose>
+          <velocity>0 0 0 0 -0 0</velocity>
+          <acceleration>0 0 0 0 -0 0</acceleration>
+          <wrench>0 0 0 0 -0 0</wrench>
+        </link>
+      </model>
+      <model name='aruco_4x4_10_4_clone_clone'>
+        <pose frame=''>5.69689 -7.06057 2.2338 0 0 -2.59997</pose>
+        <scale>1 1 1</scale>
+        <link name='link'>
+          <pose frame=''>5.69689 -7.06057 2.2338 0 0 -2.59997</pose>
+          <velocity>0 0 0 0 -0 0</velocity>
+          <acceleration>0 0 0 0 -0 0</acceleration>
+          <wrench>0 0 0 0 -0 0</wrench>
+        </link>
+      </model>
+      <model name='aruco_4x4_10_4_clone_clone_clone'>
+        <pose frame=''>8.19989 -2.97992 1.32779 0 0 -1.85578</pose>
+        <scale>1 1 1</scale>
+        <link name='link'>
+          <pose frame=''>8.19989 -2.97992 1.32779 0 0 -1.85578</pose>
+          <velocity>0 0 0 0 -0 0</velocity>
+          <acceleration>0 0 0 0 -0 0</acceleration>
+          <wrench>0 0 0 0 -0 0</wrench>
+        </link>
+      </model>
+      <model name='aruco_4x4_10_4_clone_clone_clone_clone'>
+        <pose frame=''>8.85175 3.19015 1.36702 0 0 -1.49054</pose>
+        <scale>1 1 1</scale>
+        <link name='link'>
+          <pose frame=''>8.85175 3.19015 1.36702 0 0 -1.49054</pose>
+          <velocity>0 0 0 0 -0 0</velocity>
+          <acceleration>0 0 0 0 -0 0</acceleration>
+          <wrench>0 0 0 0 -0 0</wrench>
+        </link>
+      </model>
+      <model name='aruco_4x4_10_4_clone_clone_clone_clone_clone'>
+        <pose frame=''>7.68937 7.67133 1.65619 0 0 -0.205786</pose>
+        <scale>1 1 1</scale>
+        <link name='link'>
+          <pose frame=''>7.68937 7.67133 1.65619 0 0 -0.205786</pose>
+          <velocity>0 0 0 0 -0 0</velocity>
+          <acceleration>0 0 0 0 -0 0</acceleration>
+          <wrench>0 0 0 0 -0 0</wrench>
+        </link>
+      </model>
+      <model name='aruco_4x4_10_4_clone_clone_clone_clone_clone_clone'>
+        <pose frame=''>3.63155 6.28969 2.84484 0 -0 0.69089</pose>
+        <scale>1 1 1</scale>
+        <link name='link'>
+          <pose frame=''>3.63155 6.28969 2.84484 0 -0 0.69089</pose>
+          <velocity>0 0 0 0 -0 0</velocity>
+          <acceleration>0 0 0 0 -0 0</acceleration>
+          <wrench>0 0 0 0 -0 0</wrench>
+        </link>
+      </model>
+      <model name='aruco_4x4_7'>
+        <pose frame=''>0 0 0.06 0 -1.57 0</pose>
+        <scale>1 1 1</scale>
+        <link name='link'>
+          <pose frame=''>0 0 0.06 0 -1.57 0</pose>
+          <velocity>0 0 0 0 -0 0</velocity>
+          <acceleration>0 0 0 0 -0 0</acceleration>
+          <wrench>0 0 0 0 -0 0</wrench>
+        </link>
+      </model>
+      <model name='asphalt_plane'>
+        <pose frame=''>0 0 0 0 -0 0</pose>
+        <scale>1 1 1</scale>
+        <link name='link'>
+          <pose frame=''>0 0 0 0 -0 0</pose>
+          <velocity>0 0 0 0 -0 0</velocity>
+          <acceleration>0 0 0 0 -0 0</acceleration>
+          <wrench>0 0 0 0 -0 0</wrench>
+        </link>
+      </model>
+      <model name='ground_plane'>
+        <pose frame=''>0 0 0 0 -0 0</pose>
+        <scale>1 1 1</scale>
+        <link name='link'>
+          <pose frame=''>0 0 0 0 -0 0</pose>
+          <velocity>0 0 0 0 -0 0</velocity>
+          <acceleration>0 0 0 0 -0 0</acceleration>
+          <wrench>0 0 0 0 -0 0</wrench>
+        </link>
+      </model>
+      <light name='sun'>
+        <pose frame=''>0 0 10 0 -0 0</pose>
+      </light>
+    </state>
+    
+    <!--
+    <gui fullscreen='0'>
+      <camera name='user_camera'>
+        <pose frame=''>11.8155 3.98007 41.9388 0 1.4018 -3.13451</pose>
+        <view_controller>orbit</view_controller>
+        <projection_type>perspective</projection_type>
+      </camera>
+    </gui> -->
+    
+    <model name='aruco_4x4_7'>
+      <static>1</static>
+      <link name='link'>
+        <pose frame=''>0 0 0 0 -0 0</pose>
+        <visual name='visual'>
+          <geometry>
+            <box>
+              <size>0.015 0.5 0.5</size>
+            </box>
+          </geometry>
+          <material>
+            <script>
+              <uri>model://aruco_4x4_7/materials/scripts</uri>
+              <uri>model://aruco_4x4_7/materials/textures</uri>
+              <name>aruco_4x4_7/Diffuse</name>
+            </script>
+          </material>
+        </visual>
+        <visual name='aruco_frame'>
+          <pose frame=''>-0.001 0 0 0 -0 0</pose>
+          <geometry>
+            <box>
+              <size>0.015 0.65 0.65</size>
+            </box>
+          </geometry>
+        </visual>
+        <collision name='collision'>
+          <geometry>
+            <box>
+              <size>0.015 0.65 0.65</size>
+            </box>
+          </geometry>
+          <max_contacts>10</max_contacts>
+          <surface>
+            <contact>
+              <ode/>
+            </contact>
+            <bounce/>
+            <friction>
+              <torsional>
+                <ode/>
+              </torsional>
+              <ode/>
+            </friction>
+          </surface>
+        </collision>
+        <self_collide>0</self_collide>
+        <kinematic>0</kinematic>
+        <gravity>1</gravity>
+      </link>
+      <pose frame=''>-1.66331 -3.27842 0 0 -0 0</pose>
+    </model>
+    <model name='aruco_4x4_10_0'>
+      <static>1</static>
+      <link name='link'>
+        <pose frame=''>0 0 0 0 -0 0</pose>
+        <visual name='visual'>
+          <geometry>
+            <box>
+              <size>0.015 0.5 0.5</size>
+            </box>
+          </geometry>
+          <material>
+            <script>
+              <uri>model://aruco_4x4_10/materials/scripts</uri>
+              <uri>model://aruco_4x4_10/materials/textures</uri>
+              <name>aruco_4x4_10/Diffuse</name>
+            </script>
+          </material>
+        </visual>
+        <visual name='aruco_frame'>
+          <pose frame=''>-0.001 0 0 0 -0 0</pose>
+          <geometry>
+            <box>
+              <size>0.015 0.65 0.65</size>
+            </box>
+          </geometry>
+        </visual>
+        <collision name='collision'>
+          <geometry>
+            <box>
+              <size>0.015 0.65 0.65</size>
+            </box>
+          </geometry>
+          <max_contacts>10</max_contacts>
+          <surface>
+            <contact>
+              <ode/>
+            </contact>
+            <bounce/>
+            <friction>
+              <torsional>
+                <ode/>
+              </torsional>
+              <ode/>
+            </friction>
+          </surface>
+        </collision>
+        <self_collide>0</self_collide>
+        <kinematic>0</kinematic>
+        <gravity>1</gravity>
+      </link>
+      <pose frame=''>-3.43295 0.43995 0 0 -0 0</pose>
+    </model>
+    <model name='aruco_4x4_10_1'>
+      <static>1</static>
+      <link name='link'>
+        <pose frame=''>0 0 0 0 -0 0</pose>
+        <visual name='visual'>
+          <geometry>
+            <box>
+              <size>0.015 0.5 0.5</size>
+            </box>
+          </geometry>
+          <material>
+            <script>
+              <uri>model://aruco_4x4_10/materials/scripts</uri>
+              <uri>model://aruco_4x4_10/materials/textures</uri>
+              <name>aruco_4x4_10/Diffuse</name>
+            </script>
+          </material>
+        </visual>
+        <visual name='aruco_frame'>
+          <pose frame=''>-0.001 0 0 0 -0 0</pose>
+          <geometry>
+            <box>
+              <size>0.015 0.65 0.65</size>
+            </box>
+          </geometry>
+        </visual>
+        <collision name='collision'>
+          <geometry>
+            <box>
+              <size>0.015 0.65 0.65</size>
+            </box>
+          </geometry>
+          <max_contacts>10</max_contacts>
+          <surface>
+            <contact>
+              <ode/>
+            </contact>
+            <bounce/>
+            <friction>
+              <torsional>
+                <ode/>
+              </torsional>
+              <ode/>
+            </friction>
+          </surface>
+        </collision>
+        <self_collide>0</self_collide>
+        <kinematic>0</kinematic>
+        <gravity>1</gravity>
+      </link>
+      <pose frame=''>-7.65517 0.899453 0 0 -0 0</pose>
+    </model>
+    <model name='aruco_4x4_10_2'>
+      <static>1</static>
+      <link name='link'>
+        <pose frame=''>0 0 0 0 -0 0</pose>
+        <visual name='visual'>
+          <geometry>
+            <box>
+              <size>0.015 0.5 0.5</size>
+            </box>
+          </geometry>
+          <material>
+            <script>
+              <uri>model://aruco_4x4_10/materials/scripts</uri>
+              <uri>model://aruco_4x4_10/materials/textures</uri>
+              <name>aruco_4x4_10/Diffuse</name>
+            </script>
+          </material>
+        </visual>
+        <visual name='aruco_frame'>
+          <pose frame=''>-0.001 0 0 0 -0 0</pose>
+          <geometry>
+            <box>
+              <size>0.015 0.65 0.65</size>
+            </box>
+          </geometry>
+        </visual>
+        <collision name='collision'>
+          <geometry>
+            <box>
+              <size>0.015 0.65 0.65</size>
+            </box>
+          </geometry>
+          <max_contacts>10</max_contacts>
+          <surface>
+            <contact>
+              <ode/>
+            </contact>
+            <bounce/>
+            <friction>
+              <torsional>
+                <ode/>
+              </torsional>
+              <ode/>
+            </friction>
+          </surface>
+        </collision>
+        <self_collide>0</self_collide>
+        <kinematic>0</kinematic>
+        <gravity>1</gravity>
+      </link>
+      <pose frame=''>-8.86541 -3.8308 0 0 -0 0</pose>
+    </model>
+    <model name='aruco_4x4_10_3'>
+      <static>1</static>
+      <link name='link'>
+        <pose frame=''>0 0 0 0 -0 0</pose>
+        <visual name='visual'>
+          <geometry>
+            <box>
+              <size>0.015 0.5 0.5</size>
+            </box>
+          </geometry>
+          <material>
+            <script>
+              <uri>model://aruco_4x4_10/materials/scripts</uri>
+              <uri>model://aruco_4x4_10/materials/textures</uri>
+              <name>aruco_4x4_10/Diffuse</name>
+            </script>
+          </material>
+        </visual>
+        <visual name='aruco_frame'>
+          <pose frame=''>-0.001 0 0 0 -0 0</pose>
+          <geometry>
+            <box>
+              <size>0.015 0.65 0.65</size>
+            </box>
+          </geometry>
+        </visual>
+        <collision name='collision'>
+          <geometry>
+            <box>
+              <size>0.015 0.65 0.65</size>
+            </box>
+          </geometry>
+          <max_contacts>10</max_contacts>
+          <surface>
+            <contact>
+              <ode/>
+            </contact>
+            <bounce/>
+            <friction>
+              <torsional>
+                <ode/>
+              </torsional>
+              <ode/>
+            </friction>
+          </surface>
+        </collision>
+        <self_collide>0</self_collide>
+        <kinematic>0</kinematic>
+        <gravity>1</gravity>
+      </link>
+      <pose frame=''>-8.11328 -8.41558 0 0 -0 0</pose>
+    </model>
+    <model name='aruco_4x4_10_4_clone'>
+      <static>1</static>
+      <link name='link'>
+        <pose frame=''>0 0 0 0 -0 0</pose>
+        <visual name='visual'>
+          <geometry>
+            <box>
+              <size>0.015 0.5 0.5</size>
+            </box>
+          </geometry>
+          <material>
+            <script>
+              <uri>model://aruco_4x4_10/materials/scripts</uri>
+              <uri>model://aruco_4x4_10/materials/textures</uri>
+              <name>aruco_4x4_10/Diffuse</name>
+            </script>
+          </material>
+        </visual>
+        <visual name='aruco_frame'>
+          <pose frame=''>-0.001 0 0 0 -0 0</pose>
+          <geometry>
+            <box>
+              <size>0.015 0.65 0.65</size>
+            </box>
+          </geometry>
+        </visual>
+        <collision name='collision'>
+          <geometry>
+            <box>
+              <size>0.015 0.65 0.65</size>
+            </box>
+          </geometry>
+          <max_contacts>10</max_contacts>
+          <surface>
+            <contact>
+              <ode/>
+            </contact>
+            <bounce/>
+            <friction>
+              <torsional>
+                <ode/>
+              </torsional>
+              <ode/>
+            </friction>
+          </surface>
+        </collision>
+        <self_collide>0</self_collide>
+        <kinematic>0</kinematic>
+        <gravity>1</gravity>
+      </link>
+      <pose frame=''>-0.677684 -7.49522 2.56514 0 0 -3.1392</pose>
+    </model>
+    <model name='aruco_4x4_10_4_clone_clone'>
+      <static>1</static>
+      <link name='link'>
+        <pose frame=''>0 0 0 0 -0 0</pose>
+        <visual name='visual'>
+          <geometry>
+            <box>
+              <size>0.015 0.5 0.5</size>
+            </box>
+          </geometry>
+          <material>
+            <script>
+              <uri>model://aruco_4x4_10/materials/scripts</uri>
+              <uri>model://aruco_4x4_10/materials/textures</uri>
+              <name>aruco_4x4_10/Diffuse</name>
+            </script>
+          </material>
+        </visual>
+        <visual name='aruco_frame'>
+          <pose frame=''>-0.001 0 0 0 -0 0</pose>
+          <geometry>
+            <box>
+              <size>0.015 0.65 0.65</size>
+            </box>
+          </geometry>
+        </visual>
+        <collision name='collision'>
+          <geometry>
+            <box>
+              <size>0.015 0.65 0.65</size>
+            </box>
+          </geometry>
+          <max_contacts>10</max_contacts>
+          <surface>
+            <contact>
+              <ode/>
+            </contact>
+            <bounce/>
+            <friction>
+              <torsional>
+                <ode/>
+              </torsional>
+              <ode/>
+            </friction>
+          </surface>
+        </collision>
+        <self_collide>0</self_collide>
+        <kinematic>0</kinematic>
+        <gravity>1</gravity>
+      </link>
+      <pose frame=''>5.69689 -7.06057 0.420165 0 0 -3.1392</pose>
+    </model>
+    <model name='aruco_4x4_10_4_clone_clone_clone'>
+      <static>1</static>
+      <link name='link'>
+        <pose frame=''>0 0 0 0 -0 0</pose>
+        <visual name='visual'>
+          <geometry>
+            <box>
+              <size>0.015 0.5 0.5</size>
+            </box>
+          </geometry>
+          <material>
+            <script>
+              <uri>model://aruco_4x4_10/materials/scripts</uri>
+              <uri>model://aruco_4x4_10/materials/textures</uri>
+              <name>aruco_4x4_10/Diffuse</name>
+            </script>
+          </material>
+        </visual>
+        <visual name='aruco_frame'>
+          <pose frame=''>-0.001 0 0 0 -0 0</pose>
+          <geometry>
+            <box>
+              <size>0.015 0.65 0.65</size>
+            </box>
+          </geometry>
+        </visual>
+        <collision name='collision'>
+          <geometry>
+            <box>
+              <size>0.015 0.65 0.65</size>
+            </box>
+          </geometry>
+          <max_contacts>10</max_contacts>
+          <surface>
+            <contact>
+              <ode/>
+            </contact>
+            <bounce/>
+            <friction>
+              <torsional>
+                <ode/>
+              </torsional>
+              <ode/>
+            </friction>
+          </surface>
+        </collision>
+        <self_collide>0</self_collide>
+        <kinematic>0</kinematic>
+        <gravity>1</gravity>
+      </link>
+      <pose frame=''>8.6743 -2.80555 0.420165 0 0 -2.59997</pose>
+    </model>
+    <model name='aruco_4x4_10_4_clone_clone_clone_clone'>
+      <static>1</static>
+      <link name='link'>
+        <pose frame=''>0 0 0 0 -0 0</pose>
+        <visual name='visual'>
+          <geometry>
+            <box>
+              <size>0.015 0.5 0.5</size>
+            </box>
+          </geometry>
+          <material>
+            <script>
+              <uri>model://aruco_4x4_10/materials/scripts</uri>
+              <uri>model://aruco_4x4_10/materials/textures</uri>
+              <name>aruco_4x4_10/Diffuse</name>
+            </script>
+          </material>
+        </visual>
+        <visual name='aruco_frame'>
+          <pose frame=''>-0.001 0 0 0 -0 0</pose>
+          <geometry>
+            <box>
+              <size>0.015 0.65 0.65</size>
+            </box>
+          </geometry>
+        </visual>
+        <collision name='collision'>
+          <geometry>
+            <box>
+              <size>0.015 0.65 0.65</size>
+            </box>
+          </geometry>
+          <max_contacts>10</max_contacts>
+          <surface>
+            <contact>
+              <ode/>
+            </contact>
+            <bounce/>
+            <friction>
+              <torsional>
+                <ode/>
+              </torsional>
+              <ode/>
+            </friction>
+          </surface>
+        </collision>
+        <self_collide>0</self_collide>
+        <kinematic>0</kinematic>
+        <gravity>1</gravity>
+      </link>
+      <pose frame=''>8.98767 5.45697 0.420165 0 0 -1.85578</pose>
+    </model>
+    <model name='aruco_4x4_10_4_clone_clone_clone_clone_clone'>
+      <static>1</static>
+      <link name='link'>
+        <pose frame=''>0 0 0 0 -0 0</pose>
+        <visual name='visual'>
+          <geometry>
+            <box>
+              <size>0.015 0.5 0.5</size>
+            </box>
+          </geometry>
+          <material>
+            <script>
+              <uri>model://aruco_4x4_10/materials/scripts</uri>
+              <uri>model://aruco_4x4_10/materials/textures</uri>
+              <name>aruco_4x4_10/Diffuse</name>
+            </script>
+          </material>
+        </visual>
+        <visual name='aruco_frame'>
+          <pose frame=''>-0.001 0 0 0 -0 0</pose>
+          <geometry>
+            <box>
+              <size>0.015 0.65 0.65</size>
+            </box>
+          </geometry>
+        </visual>
+        <collision name='collision'>
+          <geometry>
+            <box>
+              <size>0.015 0.65 0.65</size>
+            </box>
+          </geometry>
+          <max_contacts>10</max_contacts>
+          <surface>
+            <contact>
+              <ode/>
+            </contact>
+            <bounce/>
+            <friction>
+              <torsional>
+                <ode/>
+              </torsional>
+              <ode/>
+            </friction>
+          </surface>
+        </collision>
+        <self_collide>0</self_collide>
+        <kinematic>0</kinematic>
+        <gravity>1</gravity>
+      </link>
+      <pose frame=''>5.66771 8.09333 0.420165 0 0 -1.49054</pose>
+    </model>
+    <model name='aruco_4x4_10_4_clone_clone_clone_clone_clone_clone'>
+      <static>1</static>
+      <link name='link'>
+        <pose frame=''>0 0 0 0 -0 0</pose>
+        <visual name='visual'>
+          <geometry>
+            <box>
+              <size>0.015 0.5 0.5</size>
+            </box>
+          </geometry>
+          <material>
+            <script>
+              <uri>model://aruco_4x4_10/materials/scripts</uri>
+              <uri>model://aruco_4x4_10/materials/textures</uri>
+              <name>aruco_4x4_10/Diffuse</name>
+            </script>
+          </material>
+        </visual>
+        <visual name='aruco_frame'>
+          <pose frame=''>-0.001 0 0 0 -0 0</pose>
+          <geometry>
+            <box>
+              <size>0.015 0.65 0.65</size>
+            </box>
+          </geometry>
+        </visual>
+        <collision name='collision'>
+          <geometry>
+            <box>
+              <size>0.015 0.65 0.65</size>
+            </box>
+          </geometry>
+          <max_contacts>10</max_contacts>
+          <surface>
+            <contact>
+              <ode/>
+            </contact>
+            <bounce/>
+            <friction>
+              <torsional>
+                <ode/>
+              </torsional>
+              <ode/>
+            </friction>
+          </surface>
+        </collision>
+        <self_collide>0</self_collide>
+        <kinematic>0</kinematic>
+        <gravity>1</gravity>
+      </link>
+      <pose frame=''>4.19107 7.75794 0.420165 0 0 -0.205786</pose>
+    </model>
+  </world>
+</sdf>

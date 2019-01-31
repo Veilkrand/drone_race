@@ -1,0 +1,71 @@
+<launch>
+  <arg name="mav_name" default="firefly"/>
+  <!-- <arg name="mav_name" default="hummingbird"/> -->
+     
+  <arg name="world_name" default="test_track"/>
+  <arg name="enable_logging" default="false" />
+  <arg name="enable_ground_truth" default="true" />
+  <arg name="log_file" default="$(arg mav_name)" />
+    
+    
+  <env name="GAZEBO_MODEL_PATH" value="${GAZEBO_MODEL_PATH}:$(find rotors_gazebo)/models"/>
+  <env name="GAZEBO_RESOURCE_PATH" value="${GAZEBO_RESOURCE_PATH}:$(find rotors_gazebo)/models"/>
+  
+  <env name="GAZEBO_MODEL_PATH" value="${GAZEBO_MODEL_PATH}:$(find gazebo_assets_drone_race)/models"/>
+  <env name="GAZEBO_RESOURCE_PATH" value="${GAZEBO_RESOURCE_PATH}:$(find gazebo_assets_drone_race)/models"/>
+    
+  <include file="$(find gazebo_ros)/launch/empty_world.launch">
+    <!-- <arg name="world_name" value="$(find rotors_gazebo)/worlds/$(arg world_name).world"/> -->
+    <!-- <arg name="world_name" value="$(find gazebo_assets_drone_race)/worlds/$(arg world_name).world"/> -->
+    <arg name="world_name" value="$(find gazebo_assets_drone_race)/worlds/test_track_rotors.world"/>
+    
+    <!-- <arg name="debug" value="true"/> -->
+    <arg name="paused" value="true"/>
+    <arg name="verbose" value="false"/>
+    <!-- <arg name="gui" value="false"/> -->
+  
+  </include>
+
+  <group ns="$(arg mav_name)">
+    <include file="$(find rotors_gazebo)/launch/spawn_mav.launch">
+      <arg name="mav_name" value="$(arg mav_name)" />
+      <!-- <arg name="model" value="$(find rotors_description)/urdf/mav_generic_odometry_sensor.gazebo" /> -->
+      <arg name="model" value="$(find rotors_description)/urdf/mav_with_vi_sensor.gazebo" />
+      <arg name="enable_logging" value="$(arg enable_logging)" />
+      <arg name="enable_ground_truth" value="$(arg enable_ground_truth)" />
+      <arg name="log_file" value="$(arg log_file)"/>
+    </include>
+    
+	<node pkg="joy" type="joy_node" name="joy" required="True">
+	    <param name="dev" value="/dev/input/js0"/>
+	    <param name="autorepeat_rate" value="5" /> -->
+    </node>
+    
+    <node name="rotors_joy_interface" pkg="rotors_joy_interface" type="rotors_joy_interface">
+		<param name="axis_roll_" value="2"/>
+        <param name="axis_pitch_" value="5"/>
+        <param name="axis_thrust_" value="1"/>
+        
+        <param name="button_yaw_left_" value="0"/>
+        <param name="button_yaw_right_" value="2"/>
+      
+         <param name="button_ctrl_enable_" value="1"/>
+         <param name="button_ctrl_mode_" value="3"/>
+         <param name="button_takeoff_" value="4"/>
+         <param name="button_land_" value="5"/>
+        
+    </node>
+    
+    <node name="roll_pitch_yawrate_thrust_controller_node" pkg="rotors_control" type="roll_pitch_yawrate_thrust_controller_node" output="screen">
+      <rosparam
+        command="load" file="$(find rotors_gazebo)/resource/roll_pitch_yawrate_thrust_controller_$(arg mav_name).yaml" />
+      <rosparam command="load" file="$(find rotors_gazebo)/resource/$(arg mav_name).yaml" />
+      <remap from="odometry" to="odometry_sensor1/odometry" />
+    </node>
+    
+    <node name="robot_state_publisher" pkg="robot_state_publisher" type="robot_state_publisher" />
+    <node name="joint_state_publisher" pkg="joint_state_publisher" type="joint_state_publisher" />
+    
+  </group>
+  
+</launch>

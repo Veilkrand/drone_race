@@ -1,0 +1,59 @@
+<launch>
+   <arg name="mav_name" default="firefly"/>
+<!-- <arg name="mav_name" default="hummingbird"/> -->
+     
+  <arg name="world_name" default="test_track"/>
+  <arg name="enable_logging" default="false" />
+  <arg name="enable_ground_truth" default="false" />
+  <arg name="log_file" default="$(arg mav_name)" />
+    
+    
+  <env name="GAZEBO_MODEL_PATH" value="${GAZEBO_MODEL_PATH}:$(find rotors_gazebo)/models"/>
+  <env name="GAZEBO_RESOURCE_PATH" value="${GAZEBO_RESOURCE_PATH}:$(find rotors_gazebo)/models"/>
+  
+  <env name="GAZEBO_MODEL_PATH" value="${GAZEBO_MODEL_PATH}:$(find gazebo_assets_drone_race)/models"/>
+  <env name="GAZEBO_RESOURCE_PATH" value="${GAZEBO_RESOURCE_PATH}:$(find gazebo_assets_drone_race)/models"/>
+    
+  <include file="$(find gazebo_ros)/launch/empty_world.launch">
+    <!-- <arg name="world_name" value="$(find rotors_gazebo)/worlds/$(arg world_name).world"/> -->
+    <!-- <arg name="world_name" value="$(find gazebo_assets_drone_race)/worlds/$(arg world_name).world"/> -->
+    <arg name="world_name" value="$(find gazebo_assets_drone_race)/worlds/test_track_rotors.world"/>
+    
+    <!-- <arg name="debug" value="true"/> -->
+    <arg name="paused" value="true"/>
+    <arg name="verbose" value="false"/>
+    <!-- <arg name="gui" value="false"/> -->
+  </include>
+  
+  <include file="$(find rotors_gazebo)/launch/spawn_mav.launch">
+      <arg name="mav_name" value="$(arg mav_name)" />
+      <!-- <arg name="model" value="$(find rotors_description)/urdf/mav_generic_odometry_sensor.gazebo" /> -->
+      <arg name="model" value="$(find rotors_description)/urdf/mav_with_vi_sensor.gazebo" />
+      <arg name="enable_logging" value="$(arg enable_logging)" />
+      <arg name="enable_ground_truth" value="$(arg enable_ground_truth)" />
+      <arg name="log_file" value="$(arg log_file)"/>
+  </include>
+
+  <group ns="$(arg mav_name)">  
+    <node name="msf" pkg="msf_updates" type="pose_sensor" clear_params="true" output="screen">
+	  <remap from="msf_updates/pose_with_covariance_input" to="odometry_sensor1/pose_with_covariance" />
+	  <remap from="msf_core/imu_state_input" to="imu" />
+      <rosparam command="load" file="$(find rotors_simulator_demos)/resource/msf_simulator.yaml" />
+	  <param name="capability_group" value="Core"></param>
+	</node>
+      
+	<node name="lee_position_controller_node" pkg="rotors_control" type="lee_position_controller_node" output="screen">
+      <rosparam command="load" file="$(find rotors_gazebo)/resource/lee_controller_$(arg mav_name).yaml" />
+      <rosparam command="load" file="$(find rotors_gazebo)/resource/$(arg mav_name).yaml" />
+      <remap from="odometry" to="odometry_sensor1/odometry" />
+    </node>
+    <!-- <node name="hovering_example" pkg="rotors_gazebo" type="hovering_example" output="screen"/> -->
+    <node name="waypoint_publisher_file" pkg="rotors_gazebo" type="waypoint_publisher_file" output="screen" args="$(find gazebo_assets_drone_race)/tools/gazebo_world_parser/output_waypoints.txt"/>
+
+    
+    <node name="robot_state_publisher" pkg="robot_state_publisher" type="robot_state_publisher" />
+    <node name="joint_state_publisher" pkg="joint_state_publisher" type="joint_state_publisher" />
+    
+  </group>
+  
+</launch>
