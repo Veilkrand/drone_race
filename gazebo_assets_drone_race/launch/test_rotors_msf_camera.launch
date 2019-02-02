@@ -32,8 +32,8 @@ It launches test_track world map with RotorS, MSF, Lee Controller, and do a simp
   
   <include file="$(find rotors_gazebo)/launch/spawn_mav.launch">
     <arg name="mav_name" value="$(arg mav_name)" />
-    <arg name="model" value="$(find rotors_description)/urdf/$(arg mav_name)_generic_pose_sensor.gazebo" />
-    <!-- <arg name="model" value="$(find rotors_description)/urdf/mav_with_vi_sensor.gazebo" /> -->
+    <!-- <arg name="model" value="$(find rotors_description)/urdf/$(arg mav_name)_generic_pose_sensor.gazebo" /> -->
+    <arg name="model" value="$(find gazebo_assets_drone_race)/urdf/firefly_with_vi_sensor.gazebo" />
     <arg name="enable_logging" value="$(arg enable_logging)" />
     <arg name="enable_ground_truth" value="$(arg enable_ground_truth)" />
     <arg name="log_file" value="$(arg log_file)"/>
@@ -52,8 +52,8 @@ It launches test_track world map with RotorS, MSF, Lee Controller, and do a simp
       <remap from="odometry" to="msf_core/odometry" />
     </node>
 	
-    <node name="init_msf" pkg="waypoint_controller" type="init_msf" output="screen"/>
+	<node name="init_msf" pkg="waypoint_controller" type="init_msf" output="screen"/>
     <!-- <node name="hovering_example_msf" pkg="rotors_simulator_demos" type="hovering_example_msf" output="screen"/> -->
-    <!-- <node name="waypoint_publisher_file" pkg="rotors_gazebo" type="waypoint_publisher_file" output="screen" args="$(find gazebo_assets_drone_race)/tools/gazebo_world_parser/output_waypoints.txt"/> -->
+    
   </group>
 </launch>

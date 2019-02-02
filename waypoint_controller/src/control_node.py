@@ -12,61 +12,16 @@ Iterate waypoints:
 
 from __future__ import print_function
 import rospy
-import time
+
 
 import math
 from geometry_msgs.msg import Pose, Point
 
+import ros_geometry as geo
 from CommandPublisher import CommandPublisher
 
 
-def euclidean_distance(point1, point2):
-    return math.sqrt( (point2.x-point1.x)**2 + (point2.y-point1.y)**2 + (point2.z-point1.z)**2 )
-
-def vector_two_points(p0, p1):
-
-    v = Point()
-    v.x = p1.x - p0.x
-    v.y = p1.y - p0.y
-    v.z = p1.z - p0.z
-
-    return v
-
-def unit_vector_two_points(point1, point2):
-
-    v = Point()
-    v.x = point2.x-point1.x
-    v.y = point2.y-point1.y
-    v.z = point2.z - point1.z
-
-    return unit_vector(v)
-
-def magnitude_vector(point):
-    return math.sqrt(point.x**2 + point.y**2 + point.z**2 )
-
-def unit_vector(point):
-
-    m = magnitude_vector(point)
-
-    point.x /= m
-    point.y /= m
-    point.z /= m
-
-    return point
-
-def dot_product_vectors(p0,p1):
-
-    return p0.x*p1.x + p0.y*p1.y + p0.z*p1.z
-
-def vector_from_RPY(roll, pitch, yaw):
-
-    v = Point()
-    v.y = math.sin(yaw)*math.cos(pitch)
-    v.x = math.cos(yaw)*math.cos(pitch)
-    v.z = - math.sin(pitch)
-    return unit_vector(v)
-
-class PublisherSubscriber():
+class WaypointController():
 
     def __init__(self, _node_name, _namespace, _poses):
         self.node_name = _node_name
@@ -77,19 +32,18 @@ class PublisherSubscriber():
         self._last_distance = None # To measure distance to waypoint
 
         # Params
-        #self.publish_topic_image_result = rospy.get_param("~publish_topic_image_result", False)
+        self.target_exit_speed = rospy.get_param("~target_exit_speed", 1)
 
 
         # Publisher topics
 
         ## Command publisher
         self.command_pub = CommandPublisher(_namespace)
-        self.waypoint_index = 0
+        self.waypoint_index = -1
 
     def start(self):
         # First Waypoint
-        self.command_pub.publish_pose_command(poses[0][0], poses[0][1], poses[0][2], poses[0][3], poses[0][4], poses[0][5])
-
+        # self.command_pub.publish_pose_command(poses[0][0], poses[0][1], poses[0][2], poses[0][3], poses[0][4], poses[0][5])
 
         # Subscriber
         self.ego_pose_sub = rospy.Subscriber('/' + self._namespace + '/odometry_sensor1/pose', Pose, self._callback, queue_size=1)
@@ -110,8 +64,8 @@ class PublisherSubscriber():
 
     def process_msg(self, msg):
 
-        _exit_speed = 2 #waypoint exit speed in m/s
-        _threshold = 1 # in m to switch to the next waypoint
+        _exit_speed = self.target_exit_speed #waypoint exit speed in m/s
+        _distance_threshold = 2 # in m to switch to the next waypoint
 
         waypoint = Point(
                             self.poses[self.waypoint_index][0],
@@ -120,7 +74,7 @@ class PublisherSubscriber():
                             )
 
 
-        d = euclidean_distance(msg.position, waypoint)
+        d = geo.euclidean_distance(msg.position, waypoint)
 
         if self._last_distance is None:
             self._last_distance = d
@@ -136,19 +90,19 @@ class PublisherSubscriber():
         # Use the distance from the plane of the waypoint.
         # It should be the scalar projection of the ego position vector (from waypoint to position point),
         # into the pose unit vector of the waypoint. This is the dot product of both vectors d=(x0*x1)+(y0*y1)+(z0*z1)
-        _pos_vector = vector_two_points(msg.position, waypoint)
-        _waypoint_vector = vector_from_RPY(
+        _pos_vector = geo.vector_two_points(msg.position, waypoint)
+        _waypoint_vector = geo.vector_from_RPY(
                 self.poses[self.waypoint_index][3],
                 self.poses[self.waypoint_index][4],
                 self.poses[self.waypoint_index][5]
             )
-        _distance_waypoint_plane = dot_product_vectors(_pos_vector, _waypoint_vector)
+        _distance_waypoint_plane = geo.dot_product_vectors(_pos_vector, _waypoint_vector)
 
 
         print("plane distance {}m".format(_distance_waypoint_plane))
 
         #if d < _threshold or (d < 2 and delta_d < 0):
-        if _distance_waypoint_plane < 0 and d < 2:
+        if (_distance_waypoint_plane < 0 and d < _distance_threshold) or self.waypoint_index == -1:
 
             self._last_distance = None
             self.waypoint_index += 1
@@ -162,7 +116,7 @@ class PublisherSubscriber():
                 self.poses[self.waypoint_index][1],
                 self.poses[self.waypoint_index][2]
             )
-            waypoint_vector = vector_from_RPY(
+            waypoint_vector = geo.vector_from_RPY(
                 self.poses[self.waypoint_index][3],
                 self.poses[self.waypoint_index][4],
                 self.poses[self.waypoint_index][5]
@@ -214,7 +168,7 @@ class PublisherSubscriber():
                 self.poses[next_waypoint_index][2]
             )
 
-            speed_vector = unit_vector_two_points(msg.position, next_waypoint)
+            speed_vector = geo.unit_vector_two_points(msg.position, next_waypoint)
 
 
             # Scale speed
@@ -283,7 +237,9 @@ if __name__ == '__main__':
         (3.63155, 6.28969, 3.84484 + 0.5, 0.0, -0.0, 0.69089 - math.pi)
     ]
 
-    pub = PublisherSubscriber(_node_name, _namespace, poses)
+
+
+    pub = WaypointController(_node_name, _namespace, poses)
     pub.start()
 
     '''

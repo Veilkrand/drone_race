@@ -1,7 +1,17 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ChangeListManager">
-    <list default="true" id="07483d57-31a1-48fc-a735-21573bf55e6e" name="Default Changelist" comment="" />
+    <list default="true" id="07483d57-31a1-48fc-a735-21573bf55e6e" name="Default Changelist" comment="">
+      <change afterPath="$PROJECT_DIR$/../waypoint_controller/src/ros_geometry.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/configs/default.rviz" beforeDir="false" afterPath="$PROJECT_DIR$/configs/default.rviz" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../gazebo_assets_drone_race/launch/rotors_msf_test_track.launch" beforeDir="false" afterPath="$PROJECT_DIR$/../gazebo_assets_drone_race/launch/rotors_msf_test_track.launch" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../readme.md" beforeDir="false" afterPath="$PROJECT_DIR$/../readme.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../waypoint_controller/.idea/vcs.xml" beforeDir="false" afterPath="$PROJECT_DIR$/../waypoint_controller/.idea/vcs.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../waypoint_controller/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/../waypoint_controller/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../waypoint_controller/CMakeLists.txt" beforeDir="false" afterPath="$PROJECT_DIR$/../waypoint_controller/CMakeLists.txt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../waypoint_controller/src/control_node.py" beforeDir="false" afterPath="$PROJECT_DIR$/../waypoint_controller/src/control_node.py" afterDir="false" />
+    </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
