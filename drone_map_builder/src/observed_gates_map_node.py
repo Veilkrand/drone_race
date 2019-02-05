@@ -17,7 +17,7 @@ Pipeline
 from __future__ import print_function
 
 import rospy
-from visualization_msgs.msg import Marker
+from visualization_msgs.msg import Marker, MarkersArray
 from geometry_msgs.msg import Point, PoseWithCovarianceStamped, PoseArray, Pose  #, Point32
 import tf.transformations
 
@@ -34,27 +34,61 @@ class SubscriberPublisherObservations:
         self.fixed_frame_id = rospy.get_param("~fixed_frame_id", default='world')
 
         # Subscribers
-        self.markers_sub = rospy.Subscriber(_input_image_topic, Image, self._markers_callback, queue_size=100)
+        self.markers_sub = rospy.Subscriber(self._input_markers_topic, Marker, self._markers_callback, queue_size=100)
         #self.tf_listener = tf.TransformListener()
 
         # Publishers
-        _result_poses_topic = node_name + '/gate_poses
+        _result_poses_topic = node_name + '/gate_poses'
         self.gates_map_pub = rospy.Publisher(_result_poses_topic, MarkersArray, queue_size=100)
 
-
         ## Rospy loop
-        r = rospy.Rate(5)  # 10 Hz
+        r = rospy.Rate(5)
         while not rospy.is_shutdown():
+            #self.marker_viz_pub.publish(self.ground_truth_markers)
+            #self.gate_pose_pub.publish(self.ground_truth_poses)
 
-            # Publish Map
             r.sleep()
 
-    def _ego_pose_callback(self, data):
-        pose = self.create_marker_line_object(data, self.fixed_frame_id)
-        #print(pose.id)
-        self.ego_trajectory_viz.publish(pose)
 
-    def create_marker_line_object(self, pose, frame_id):
+
+    '''
+    def create_rviz_object(self, gate, frame_id):
+
+        marker = Marker()
+        marker.header.stamp = rospy.Time.now()
+        # marker.header.frame_id = "/map"
+        marker.header.frame_id = frame_id
+        marker.ns = self.node_name
+        marker.id = gate['id']
+
+        marker.type = marker.CUBE
+        marker.action = marker.ADD
+
+        # TODO: dims to params
+        marker.scale.x = 0.025
+        marker.scale.y = 1
+        marker.scale.z = 1
+
+        marker.color.r = 1.0
+        marker.color.g = 0.0
+        marker.color.b = 0.0
+        marker.color.a = 0.25
+
+        marker.lifetime = rospy.Duration()  # forever
+
+        marker.pose.position.x = gate['pose'][0]
+        marker.pose.position.y = gate['pose'][1]
+        marker.pose.position.z = gate['pose'][2]
+
+        marker.pose.orientation.x = gate['quaternion'][0]
+        marker.pose.orientation.y = gate['quaternion'][1]
+        marker.pose.orientation.z = gate['quaternion'][2]
+        marker.pose.orientation.w = gate['quaternion'][3]
+
+        return marker
+    '''
+
+    def create_marker_gate_object(self, pose, frame_id):
 
         marker = Marker()
         marker.header.stamp = rospy.Time.now()

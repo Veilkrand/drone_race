@@ -54,6 +54,11 @@ It launches test_track world map with RotorS, MSF, Lee Controller, and do a simp
 	
 	<node name="init_msf" pkg="waypoint_controller" type="init_msf" output="screen"/>
     <!-- <node name="hovering_example_msf" pkg="rotors_simulator_demos" type="hovering_example_msf" output="screen"/> -->
-    
+
+    # --
+    # Set the drone looking towards the first gate with several maneuvers
+    <node name="$(anon a)" pkg="rotors_gazebo" type="waypoint_publisher" output="screen"  args="0 0 1 90 10"/>
+    <node name="$(anon b)" pkg="rotors_gazebo" type="waypoint_publisher" output="screen"  args="0 0 1 180 12"/>
+
   </group>
 </launch>

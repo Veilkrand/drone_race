@@ -22,3 +22,7 @@ Or without camera (faster): `$ roslaunch gazebo_assets_drone_race rotors_msf_tes
 `$ rosrun drone_map_builder gt_ego_position.py`
 4. Run RVIZ
 `$ rviz -d $(rospack find drone_map_builder)/configs/default.rviz`
+
+
+## RotorS commands examples
+`$ rosrun rotors_gazebo waypoint_publisher 0 0 1 180 0 __ns:=firefly`
