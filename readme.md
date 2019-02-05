@@ -6,6 +6,9 @@
 - ethzasl_msf
 - rotors_simulator_demos
 
+See more detailed installation instructions in
+[install.md](https://github.com/Veilkrand/drone_race/blob/master/install.md).
+
 
 ## Run environment
 
