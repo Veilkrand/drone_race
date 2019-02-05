@@ -22,20 +22,7 @@ from geometry_msgs.msg import Point, PoseWithCovarianceStamped, PoseArray, Pose 
 import tf.transformations
 
 
-class ReusableIdGenerator:
-
-    def __init__(self, number):
-        self.index = -1
-        self.number = number
-
-    def get_id(self):
-
-        self.index += 1
-        if self.index == self.number: self.index = 0
-
-        return self.index
-
-class SubscriberPublisherGates:
+class SubscriberPublisherObservations:
 
     def __init__(self, node_name):
 
@@ -44,25 +31,16 @@ class SubscriberPublisherGates:
         # Params
         self.input_markers_topic = rospy.get_param("~input_markers_topic", default='markertracker_node/markers')
         self.parent_frame_id = rospy.get_param("~parent_frame_id", default='base_link')
-
         self.fixed_frame_id = rospy.get_param("~fixed_frame_id", default='world')
 
-        self._input_topic_ego_pose = '/firefly/odometry_sensor1/pose'
-
         # Subscribers
-        #self.markers_sub = rospy.Subscriber(_input_image_topic, Image, self._markers_callback, queue_size=100)
+        self.markers_sub = rospy.Subscriber(_input_image_topic, Image, self._markers_callback, queue_size=100)
         #self.tf_listener = tf.TransformListener()
 
-        self.ego_pose_sub = rospy.Subscriber(self._input_topic_ego_pose, Pose, self._ego_pose_callback, queue_size=1)
-
         # Publishers
-        #self.gates_map_pub = rospy.Publisher(_result_poses_topic, MarkersArray, queue_size=100)
+        _result_poses_topic = node_name + '/gate_poses
+        self.gates_map_pub = rospy.Publisher(_result_poses_topic, MarkersArray, queue_size=100)
 
-        _ouput_topic_trajectory_viz = node_name + '/trajectory_viz_markers'
-        self.ego_trajectory_viz = rospy.Publisher(_ouput_topic_trajectory_viz, Marker, queue_size=100)
-
-        # Ids gen
-        self.id_gen = ReusableIdGenerator(500)
 
         ## Rospy loop
         r = rospy.Rate(5)  # 10 Hz
@@ -128,7 +106,7 @@ if __name__ == '__main__':
 
     rospy.init_node(_node_name, anonymous=True)
 
-    SubscriberPublisherGates(_node_name)
+    SubscriberPublisherObservations(_node_name)
 
     print('Ready.')
 

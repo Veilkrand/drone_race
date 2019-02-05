@@ -1,14 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ChangeListManager">
-    <list default="true" id="42bbd17b-d700-4e92-b8ba-1fa9382ea2cf" name="Default Changelist" comment="">
-      <change afterPath="$PROJECT_DIR$/../drone_map_builder/src/gt_ego_position.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../drone_map_builder/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/../drone_map_builder/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../drone_map_builder/readme.md" beforeDir="false" afterPath="$PROJECT_DIR$/../drone_map_builder/readme.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../drone_map_builder/src/gt_gates_publisher_node.py" beforeDir="false" afterPath="$PROJECT_DIR$/../drone_map_builder/src/gt_gates_publisher_node.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/control_node.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/control_node.py" afterDir="false" />
-    </list>
+    <list default="true" id="42bbd17b-d700-4e92-b8ba-1fa9382ea2cf" name="Default Changelist" comment="" />
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -160,7 +153,6 @@
   </component>
   <component name="ToolWindowManager">
     <frame x="347" y="231" width="1385" height="849" extended-state="0" />
-    <editor active="true" />
     <layout>
       <window_info active="true" content_ui="combo" id="Project" order="0" visible="true" weight="0.18135096" />
       <window_info id="Structure" order="1" side_tool="true" weight="0.25" />
