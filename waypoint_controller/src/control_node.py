@@ -4,9 +4,8 @@
 
 Subscribe to waypoints messages.
 Iterate waypoints:
-    - Send current waypoint command
-    - Calculate euclidean distance to current waypoint
-    - Threshold distance to advance to next waypoint
+    - Send current waypoint control command
+    - Calculate condition to advance to next waypoint
 
 """
 
@@ -225,7 +224,7 @@ if __name__ == '__main__':
     '''
 
     poses = [
-        (-3.43295, 1.13137, 2.17771 + 0.5, 0.0, -0.0, 0.0 - math.pi), # x, y, z, rx, ry, rz
+        (-3.43295, 1.13137, 2.17771 + 0.5, 0.0, -0.0, 0.0 - math.pi), # x, y, z, Roll, Pitch, Yaw
         (-8.00466, 1.05556, 3.19768 + 0.5, 0.0, -0.0, 1.04754 - math.pi),
         (-8.86541, -3.8308, 3.72565 + 0.5, 0.0, -0.0, 1.59136 - math.pi),
         (-6.41389, -7.30975, 3.77515 + 0.5, 0.0, -0.0, 2.52009 - math.pi),

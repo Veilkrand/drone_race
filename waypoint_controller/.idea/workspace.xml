@@ -2,14 +2,11 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="42bbd17b-d700-4e92-b8ba-1fa9382ea2cf" name="Default Changelist" comment="">
-      <change afterPath="$PROJECT_DIR$/src/ros_geometry.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/../drone_map_builder/src/gt_ego_position.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/../drone_map_builder/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/../drone_map_builder/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../drone_map_builder/configs/default.rviz" beforeDir="false" afterPath="$PROJECT_DIR$/../drone_map_builder/configs/default.rviz" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../gazebo_assets_drone_race/launch/rotors_msf_test_track.launch" beforeDir="false" afterPath="$PROJECT_DIR$/../gazebo_assets_drone_race/launch/rotors_msf_test_track.launch" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../readme.md" beforeDir="false" afterPath="$PROJECT_DIR$/../readme.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/vcs.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/vcs.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../drone_map_builder/readme.md" beforeDir="false" afterPath="$PROJECT_DIR$/../drone_map_builder/readme.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../drone_map_builder/src/gt_gates_publisher_node.py" beforeDir="false" afterPath="$PROJECT_DIR$/../drone_map_builder/src/gt_gates_publisher_node.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/CMakeLists.txt" beforeDir="false" afterPath="$PROJECT_DIR$/CMakeLists.txt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/control_node.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/control_node.py" afterDir="false" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
@@ -23,8 +20,11 @@
       <file pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/src/control_node.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="232">
-              <caret line="17" column="41" lean-forward="true" selection-start-line="17" selection-start-column="41" selection-end-line="17" selection-end-column="41" />
+            <state relative-caret-position="320">
+              <caret line="226" column="97" selection-start-line="226" selection-start-column="97" selection-end-line="226" selection-end-column="97" />
+              <folding>
+                <element signature="e#253#290#0" expanded="true" />
+              </folding>
             </state>
           </provider>
         </entry>
@@ -94,8 +94,8 @@
     </option>
   </component>
   <component name="ProjectFrameBounds">
-    <option name="x" value="190" />
-    <option name="y" value="125" />
+    <option name="x" value="347" />
+    <option name="y" value="231" />
     <option name="width" value="1385" />
     <option name="height" value="849" />
   </component>
@@ -159,7 +159,7 @@
     <servers />
   </component>
   <component name="ToolWindowManager">
-    <frame x="190" y="125" width="1385" height="849" extended-state="0" />
+    <frame x="347" y="231" width="1385" height="849" extended-state="0" />
     <editor active="true" />
     <layout>
       <window_info active="true" content_ui="combo" id="Project" order="0" visible="true" weight="0.18135096" />
@@ -230,8 +230,11 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/src/control_node.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="232">
-          <caret line="17" column="41" lean-forward="true" selection-start-line="17" selection-start-column="41" selection-end-line="17" selection-end-column="41" />
+        <state relative-caret-position="320">
+          <caret line="226" column="97" selection-start-line="226" selection-start-column="97" selection-end-line="226" selection-end-column="97" />
+          <folding>
+            <element signature="e#253#290#0" expanded="true" />
+          </folding>
         </state>
       </provider>
     </entry>

@@ -16,6 +16,6 @@ Or without camera (faster): `$ roslaunch gazebo_assets_drone_race rotors_msf_tes
 `$ rosrun waypoint_controller control_node.py _target_exit_speed:=1`
 3. Run ground truth and visualizations:
 `$ rosrun drone_map_builder gt_gates_publisher_node.py`
-`$ rosrun drone_map_builder observed_gates_map_node.py`
+`$ rosrun drone_map_builder gt_ego_position.py`
 4. Run RVIZ
 `$ rviz -d $(rospack find drone_map_builder)/configs/default.rviz`

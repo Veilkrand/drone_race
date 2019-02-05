@@ -3,7 +3,7 @@
 # Ground Truth Gate Publisher
 Load a ground truth gates file and publish:
 1. Visualization topic into RViz
-2. Gate map using gates messages
+3. PoseArray topic of gate ground truth poses
 """
 
 from __future__ import print_function
