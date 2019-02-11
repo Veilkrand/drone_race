@@ -27,7 +27,7 @@ class SplinePlanner():
         self.max_speed = rospy.get_param("~target_exit_speed", 1.0)
         self.gates_sub = rospy.Subscriber('gt_gates_publisher/gt_gates', PoseArray, self.gates_callback)
         self.odometry_sub = rospy.Subscriber('/' + self._namespace + '/odometry_sensor1/odometry', Odometry, self.odometry_callback)
-        self.traj_pub = rospy.Publisher('planner/trajectory', MultiDOFJointTrajectory, queue_size=1, latch=True)
+        self.traj_pub = rospy.Publisher('/' + _namespace + '/command/trajectory', MultiDOFJointTrajectory, queue_size=1, latch=True)
 
     def gates_callback(self, msg):
         self.gates = msg.poses
@@ -56,8 +56,8 @@ class SplinePlanner():
                     if not started:
                         started = True
                         print("spline_planner published first trajectory")
-                    # print("Trajectory:")
-                    # print(str(trajectory))
+                    #print("Trajectory:")
+                    #print(str(trajectory))
             else:
                 print("spline_planner waiting for input")
             rate.sleep()
@@ -73,9 +73,9 @@ class SplinePlanner():
 
         waypoints = [start_position]
 
-        start_speed = geo.magnitude_vector(start_velocity)
-        if start_speed > 0.3:
-            waypoints.append(geo.point_plus_vector(start_position, geo.normalize(start_velocity, 0.1)))
+        #start_speed = geo.magnitude_vector(start_velocity)
+        #if start_speed > 0.3:
+        #    waypoints.append(geo.point_plus_vector(start_position, geo.normalize(start_velocity, 0.1)))
 
         for gate in gates:
             for offset in [-0.1,0.1]:
