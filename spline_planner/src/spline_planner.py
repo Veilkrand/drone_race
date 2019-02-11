@@ -78,7 +78,7 @@ class SplinePlanner():
         #    waypoints.append(geo.point_plus_vector(start_position, geo.normalize(start_velocity, 0.1)))
 
         for gate in gates:
-            for offset in [-0.1,0.1]:
+            for offset in [-0.5, 0.5]:
                 waypoints.append(geo.point_plus_vector(gate.position, geo.quaternion_to_vector(gate.orientation, offset)))
 
         waypoint_spline = geo.points_to_spline(waypoints)
