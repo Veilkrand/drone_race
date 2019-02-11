@@ -47,6 +47,7 @@ wstool update
 git clone git@github.com:ethz-asl/ethzasl_msf.git
 git clone git@github.com:ethz-asl/glog_catkin.git
 git clone git@github.com:catkin/catkin_simple.git
+sudo pip install scipy
 ```
 
 Deactivate some dependencies that are only needed on a real drone and which would otherwise
