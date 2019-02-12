@@ -5,7 +5,7 @@ querying methods for the fit path
 
 import math
 import operator
-from scipy.interpolate import splprep, splev
+from scipy.interpolate import splprep, spalde
 import numpy as np
 
 class SmoothedPath(object):
@@ -22,7 +22,7 @@ class SmoothedPath(object):
     #
     # the difference is this method use splrep instead of interp1d with kind='cubic'
     #
-    # splprep/splev from FITPACK library offers derivatives querying methods which is useful for later processing
+    # splprep/spalde from FITPACK library offers derivatives querying methods which is useful for later processing
     #
     # see: https://docs.scipy.org/doc/scipy/reference/tutorial/interpolate.html#spline-interpolation
     distance_so_far = 0.0
@@ -60,10 +60,9 @@ class SmoothedPath(object):
     while True:
       # query point and derivatives from the fit spline.
       # zero-order derivative is the point on the spline
-      pt = np.array(splev(current_t, self.tck, der=0))
-      deriv1 = np.array(splev(current_t, self.tck, der=1))
-      deriv2 = np.array(splev(current_t, self.tck, der=2))
-
+      alde = np.array(spalde(current_t, self.tck))
+      pt, deriv1, deriv2 = alde[:, 0], alde[:, 1], alde[:, 2]
+      
       # by definition (see https://en.wikipedia.org/wiki/Arc_length#Definition_for_a_smooth_curve),
       # arc length at some chord length t is: s(t) = \int_0^t ||s'(t)|| dt, 
       # where s'(t) is the 1st order derivative at t
