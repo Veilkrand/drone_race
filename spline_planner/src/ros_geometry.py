@@ -7,7 +7,7 @@ def distance(point1, point2):
     return math.sqrt( (point2.x-point1.x)**2 + (point2.y-point1.y)**2 + (point2.z-point1.z)**2 )
 
 def vector_from_to(p0, p1):
-    v = Point()
+    v = Vector3()
     v.x = p1.x - p0.x
     v.y = p1.y - p0.y
     v.z = p1.z - p0.z
@@ -107,14 +107,14 @@ def spline_distance_to_point(spline, distance):
 def spline_distance_to_tangent(spline,distance):
     return unit_vector_from_to(spline_distance_to_point(spline, distance - 0.1), spline_distance_to_point(spline, distance + 0.1))
 
-def spline_point_to_curvature(spline, point):
+def spline_distance_to_curvature(spline, distance):
     # Centripetal acceleration = curvature * speed^2 where both acceleration and curvature have type Vector3.
-    # TODO: Use example speed of 1 m/s2 to calculate acceleration, then convert to curvature.
+    # Use example speed of 1 m/s2 to calculate acceleration, then convert to curvature.
     # https://opentextbc.ca/physicstestbook2/chapter/centripetal-acceleration/
     # https://en.wikipedia.org/wiki/Differential_geometry_of_curves#Normal_or_curvature_vector
-    res = Vector3()
-    res.x = 0.0
-    res.y = 0.0
-    res.z = 0.0
-    return res
+    velocity_before = spline_distance_to_tangent(spline, distance - 0.1)
+    velocity_after = spline_distance_to_tangent(spline, distance - 0.1)
+    acceleration = scalar_multiply(1/0.2, vector_from_to(velocity_before, velocity_after))
+    curvature = acceleration # because acceleration calculated using speed of 1.0 and acceleration=curvature*speed^2
+    return curvature
 
