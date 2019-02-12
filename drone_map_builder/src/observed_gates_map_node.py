@@ -4,12 +4,17 @@ Build a map of observed markers relative to the camera.
 Pipeline
 1. Subscribe detected markers pose
 2. Subscribe ego pose in time
-3. Transform markers local pose to map pose
+3. Transform markers local pose to world pose
 4. Data association: Identify unique gates by Weighted nearest neighbour (euclidean distance threshold?)
 4.5. Correct flipping Z axis with a median moving window?
 5. Update pose estimation per observed gate. Lineal KF
 6. Publish results as markers for visualization and topic for Planning
 7. RMSE Error calculation with ground truth
+
+TODO:
+ - Include new message array with confidence per gate by numbers of observations per period
+ - Use real ego pose covariances to compute KF
+ - Weighted median average for low confidence gates
 
 """
 
