@@ -135,10 +135,10 @@ Visualization Manager:
             {}
       Update Interval: 0
       Value: true
-    - Class: rviz/Marker
+    - Class: rviz/MarkerArray
       Enabled: true
       Marker Topic: /traj_viz/trajectory_viz
-      Name: Marker
+      Name: MarkerArray
       Namespaces:
         "": true
       Queue Size: 100
@@ -183,10 +183,10 @@ Visualization Manager:
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.00999999978
-      Pitch: 1.00479734
+      Pitch: 0.779797316
       Target Frame: <Fixed Frame>
       Value: XYOrbit (rviz)
-      Yaw: 4.64355755
+      Yaw: 3.68355751
     Saved: ~
 Window Geometry:
   Displays:
