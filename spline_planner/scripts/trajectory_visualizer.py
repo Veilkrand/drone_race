@@ -11,6 +11,7 @@ from geometry_msgs.msg import Vector3, Quaternion
 from nav_msgs.msg import Odometry
 from std_msgs.msg import ColorRGBA, Float32
 from jsk_rviz_plugins.msg import OverlayText
+import ros_geometry as geo
 import math
 import numpy as np
 import tf
@@ -59,15 +60,7 @@ def trajectory_callback(traj):
     norm = math.sqrt(linear.x ** 2 + linear.y ** 2 + linear.z ** 2)
     if norm < 1e-3:
       continue
-    drone_x = np.array([linear.x / norm, linear.y / norm, linear.z / norm])
-    drone_z_t = np.array([0, 0, 1])
-    drone_y = np.cross(drone_z_t, drone_x)
-    drone_z = np.cross(drone_x, drone_y)
-    rot_mat = np.identity(4)
-    rot_mat[:3,:3] = np.array([drone_x,
-                               drone_y,
-                               drone_z]).T
-    q = tf.transformations.quaternion_from_matrix(rot_mat)
+    q = geo.vector_to_quat(linear)
     velocity_viz = Marker()
     velocity_viz.header.frame_id = "world"
     velocity_viz.header.stamp = rospy.Time.now()

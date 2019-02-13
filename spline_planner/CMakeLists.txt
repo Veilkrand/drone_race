@@ -5,7 +5,14 @@ find_package(catkin REQUIRED COMPONENTS
   rospy
   std_msgs
   geometry_msgs
-  trajectory_msgs)
+  trajectory_msgs
+  dynamic_reconfigure)
+
+generate_dynamic_reconfigure_options(
+  cfg/Planner.cfg
+)
+
+# add_dependencies(spline_planner_2.py spline_planner_gencfg)
 
 # catkin_python_setup()
 catkin_package()

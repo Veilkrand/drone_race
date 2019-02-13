@@ -3,7 +3,7 @@
     <arg name="rviz" default="1"/>
 
     <!-- Planner node -->
-    <node pkg="spline_planner" type="spline_planner.py" name="spline_planner" output="screen">
+    <node pkg="spline_planner" type="spline_planner_2.py" name="spline_planner" output="screen">
     </node>
 
     <!-- Gate pose publisher node -->
@@ -20,6 +20,7 @@
     <!-- trajectory visualization topic publisher -->
     <node pkg="spline_planner" type="trajectory_visualizer.py" name="traj_viz">
       <remap from="~trajectory" to="/firefly/command/trajectory"/>
+      <remap from="~odometry" to="/firefly/odometry_sensor1/odometry" />
     </node>
 
 </launch>

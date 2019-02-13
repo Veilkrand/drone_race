@@ -10,13 +10,16 @@ Publish MultiDOFJointTrajectory.
 from __future__ import print_function
 import rospy
 import math
-from geometry_msgs.msg import PoseArray, Pose, Point, Transform, Twist, Vector3
+from geometry_msgs.msg import PoseArray, Pose, Point, Transform, Twist, Vector3, Quaternion
 from nav_msgs.msg import Odometry
 from trajectory_msgs.msg import MultiDOFJointTrajectory, MultiDOFJointTrajectoryPoint
 from scipy.interpolate import interp1d
 import ros_geometry as geo
 from SmoothedPath import SmoothedPath
 import numpy as np
+
+from dynamic_reconfigure.server import Server
+from spline_planner.cfg import PlannerConfig
 
 class SplinePlanner():
 
@@ -28,10 +31,24 @@ class SplinePlanner():
         self.odometry = None
         self.min_speed = 0.1
         self.max_speed = rospy.get_param("~target_exit_speed", 1.0)
-        self.max_acceleration = 3 # Racing drone is probably around 10 m/s2. Set very low for now.
+        self.max_acceleration = 1 # Racing drone is probably around 10 m/s2. Set very low for now.
         self.gates_sub = rospy.Subscriber('gt_gates_publisher/gt_gates', PoseArray, self.gates_callback)
         self.odometry_sub = rospy.Subscriber('/' + self._namespace + '/odometry_sensor1/odometry', Odometry, self.odometry_callback)
         self.traj_pub = rospy.Publisher('/' + _namespace + '/command/trajectory', MultiDOFJointTrajectory, queue_size=1, latch=True)
+
+    def reconfigure_parameters(self, config, level):
+        rospy.loginfo("Parameters reconfiguration requested.")
+        rospy.loginfo("""Parameters reconfiguration requested:
+ds: {ds}
+max_speed: {max_linear_speed}
+max_total_acceleration: {max_total_acceleration}
+trajectory_length: {trajectory_length}""".format(**config))
+
+        self.max_speed = config.max_linear_speed
+        self.max_acceleration = config.max_total_acceleration
+        self.ds = config.ds
+        self.trajectory_length = config.trajectory_length
+        return config
 
     def gates_callback(self, msg):
         self.gates = msg.poses
@@ -55,7 +72,7 @@ class SplinePlanner():
             if len(self.gates) > 0 and self.odometry is not None:
                 trajectory = self.create_path(self.odometry, self.gates, self.last_visited_gate)
                 if trajectory is None:
-                    print("Failed to create trajectory")
+                     print("Failed to create trajectory")
                 else:
                     self.traj_pub.publish(trajectory)
                     if not started:
@@ -179,7 +196,7 @@ class SplinePlanner():
         for point in trajectory_points[1:]:
             transform = Transform()
             transform.translation = point['point']
-            # TODO: transform.rotation
+            transform.rotation = Quaternion(*(geo.vector_to_quat(point['velocity']).tolist()))
             velocity = Twist()
             velocity.linear = point['velocity']
             # TODO: velocity.angular
@@ -207,8 +224,9 @@ if __name__ == '__main__':
     _node_name = 'spline_planner'
     _namespace = 'firefly'
     print('* {} starting... '.format(_node_name), end="")
-    rospy.init_node(_node_name, anonymous=True)
+    rospy.init_node(_node_name)
     node = SplinePlanner(_node_name, _namespace)
+    srv = Server(PlannerConfig, node.reconfigure_parameters)
     print('Ready.')
     node.start()
     rospy.spin()

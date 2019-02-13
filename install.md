@@ -26,6 +26,11 @@ sudo rosdep init
 rosdep update
 ```
 
+It is also recommended to install some useful extra ROS packages. These packages are mainly for helping visualizing various runtime information on RViz (if you are going to run main functionalities in headless server then you don't need to install them. Install them where you have display is enough): 
+```sh
+sudo apt-get install ros-kinetic-jsk-visualization
+```
+
 Next create a Catkin workspace.
 
 ```sh

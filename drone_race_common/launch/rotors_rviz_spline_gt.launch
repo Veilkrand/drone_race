@@ -8,6 +8,7 @@
     <!-- trajectory visualization topic publisher -->
     <node pkg="spline_planner" type="trajectory_visualizer.py" name="traj_viz" output="screen" required="true">
       <remap from="~trajectory" to="/firefly/command/trajectory"/>
+      <remap from="~odometry" to="/firefly/odometry_sensor1/odometry" />
     </node>
 
     <!-- GT Gate pose publisher node -->
