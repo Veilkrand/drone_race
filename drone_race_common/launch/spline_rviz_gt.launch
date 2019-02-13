@@ -3,7 +3,7 @@
     <arg name="rviz" default="1"/>
 
     <!-- Planner node -->
-    <node pkg="spline_planner" type="spline_planner_2.py" name="spline_planner" output="screen">
+    <node pkg="spline_planner" type="planner.py" name="spline_planner" output="screen">
     </node>
 
     <!-- Gate pose publisher node -->

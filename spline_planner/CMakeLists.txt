@@ -12,11 +12,9 @@ generate_dynamic_reconfigure_options(
   cfg/Planner.cfg
 )
 
-# add_dependencies(spline_planner_2.py spline_planner_gencfg)
-
 # catkin_python_setup()
 catkin_package()
 
-# catkin_install_python(PROGRAMS src/spline_planner.py
+# catkin_install_python(PROGRAMS scripts/planner.py
 # DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
 

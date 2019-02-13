@@ -23,7 +23,7 @@ See more detailed installation instructions in
   * Or without camera (faster): `$ roslaunch gazebo_assets_drone_race rotors_msf_test_track.launch`
 2. Run waypoint controller to control the drone:
   * Waypoint controller: `$ rosrun waypoint_controller control_node.py _target_exit_speed:=1`
-  * Or spline planner: `$ rosrun spline_planner spline_planner.py`
+  * Or spline planner: `$ rosrun spline_planner planner.py`
 3. Run ground truth and visualizations:
   * `$ rosrun drone_map_builder gt_gates_publisher_node.py`
   * `$ rosrun drone_map_builder gt_ego_position.py`
