@@ -11,6 +11,7 @@ Run:
 ### TODO: 
 - Custom Map messages
 - Move params to YAML file
+- Delete ghost gates (the ones with very low confidence detected long time ago)
 - Set maximum observations to stop reconstructing map: When the map is well known, we don't need to process more observations. Uncertainty can't be lowered and we will be wasting computing resources.
 - Navigate gates to setup direction of the tracks and nodes connections, based on current ego pose and depth. Detect closed loop. Stop computing when it's a well known network.
 
