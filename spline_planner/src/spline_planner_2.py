@@ -10,11 +10,13 @@ Publish MultiDOFJointTrajectory.
 from __future__ import print_function
 import rospy
 import math
-from geometry_msgs.msg import PoseArray, Pose, Point, Transform, Twist
+from geometry_msgs.msg import PoseArray, Pose, Point, Transform, Twist, Vector3
 from nav_msgs.msg import Odometry
 from trajectory_msgs.msg import MultiDOFJointTrajectory, MultiDOFJointTrajectoryPoint
 from scipy.interpolate import interp1d
 import ros_geometry as geo
+from SmoothedPath import SmoothedPath
+import numpy as np
 
 class SplinePlanner():
 
@@ -87,12 +89,33 @@ class SplinePlanner():
             for offset in [-0.5, 0.5]:
                 waypoints.append(geo.point_plus_vector(gate.position, geo.quaternion_to_vector(gate.orientation, offset)))
 
-        waypoint_spline = geo.points_to_spline(waypoints)
-
+        # waypoint_spline = geo.points_to_spline(waypoints)
+        path = SmoothedPath()
+        path.fit(waypoints)
+        
         # TODO: determine appropriate speeds based on start speed, max speed, and max acceleration (centripetal acceleration limits speed on tight curve)
         # For now just use constant speed of self.max_speed.
-        ds = 0.2
-        trajectory_points = [{'s': i * ds, 'speed': self.max_speed, 'curvature': geo.spline_distance_to_curvature(waypoint_spline, i*ds)} for i in range(30)]
+        ds = 0.1
+        trajectory_points = []
+        def visit_cb(pt, deriv1, deriv2, s):
+            # curvature is calcuated as norm(deriv1 x deriv2) / norm(deriv1)**3
+            # see: https://en.wikipedia.org/wiki/Curvature#Local_expressions_2
+            d1xd2 = np.cross(deriv1, deriv2)
+            norm_d1 = np.linalg.norm(deriv1)
+            c = np.linalg.norm(d1xd2) / norm_d1 ** 3
+            # the first order derivative is given as ds/dt, where s is the arc length and t is the internal parameter of the spline,
+            # not time.
+            # because of this, the magnitude of first order derivative is not the same with viable speed,
+            # but nevertheless, the direction of the derivative of them are the same.
+            trajectory_points.append({
+                's': s,
+                'point': Vector3(*(pt.tolist())),
+                'speed': self.max_speed,
+                'speed_direction': Vector3(*((deriv1 / norm_d1).tolist())),
+                'curvature': c
+            })
+        path.visit_at_interval(ds, visit_cb, ds * 60)
+#        trajectory_points = [{'s': i * ds, 'speed': self.max_speed, 'curvature': geo.spline_distance_to_curvature(waypoint_spline, i*ds)} for i in range(30)]
         vmin = self.min_speed
         vmax = self.max_speed
         amax = self.max_acceleration
@@ -100,7 +123,7 @@ class SplinePlanner():
         def safe_speed(curvature, speed_neighbor):
             centripetal = curvature * speed_neighbor**2
             if centripetal >= amax:
-                return max(vmin, min(vmax, sqrt(abs(amax / curvature))))
+                return max(vmin, min(vmax, math.sqrt(abs(amax / curvature))))
             remaining_acceleration = math.sqrt(amax**2 - centripetal**2)
             dt = ds / max(vmin, speed_neighbor)
             return max(vmin, min(vmax, speed_neighbor + dt * remaining_acceleration))
@@ -108,16 +131,16 @@ class SplinePlanner():
         trajectory_points[0]['speed'] = min(vmax, max(vmin, geo.magnitude_vector(start_velocity)))
         num_traj = len(trajectory_points)
         for i in range(num_traj - 1): # iterate forwards, skipping first point which is fixed to current speed
-            trajectory_points[i+1]['speed'] = safe_speed(geo.magnitude_vector(trajectory_points[i+1]['curvature']), trajectory_points[i]['speed'])
+            trajectory_points[i+1]['speed'] = safe_speed(trajectory_points[i+1]['curvature'], trajectory_points[i]['speed'])
         for i in range(num_traj - 2):
             j = num_traj - i - 2 # iterate backwards, skipping both end points
-            curvature = geo.magnitude_vector(trajectory_points[j]['curvature'])
+            curvature = trajectory_points[j]['curvature']
             min_neighbor_speed = min(trajectory_points[j-1]['speed'],trajectory_points[j+1]['speed'])
             trajectory_points[j]['speed'] = safe_speed(curvature, min_neighbor_speed)
 
         # Set velocity based on speed and direction
         for point in trajectory_points:
-            point['velocity'] = geo.scalar_multiply(point['speed'], geo.spline_distance_to_tangent(waypoint_spline, point['s']))
+            point['velocity'] = geo.scalar_multiply(point['speed'], point['speed_direction'])
 
         # Set time based on speed and distance
         trajectory_points[0]['time'] = 0.0
@@ -152,7 +175,7 @@ class SplinePlanner():
         for point in trajectory_points:
             distance = i * ds
             transform = Transform()
-            transform.translation = geo.point_to_vector(geo.spline_distance_to_point(waypoint_spline, point['s']))
+            transform.translation = point['point']
             # TODO: transform.rotation
             velocity = Twist()
             velocity.linear = point['velocity']
