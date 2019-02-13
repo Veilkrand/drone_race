@@ -37,13 +37,14 @@ class Gate:
 
     def __init__(self, _id):
 
+        # TODO: Move to params
+        self.observations_size = 75  # Only the most relevant observations are kept
+
         # Put better ones at top, worse ones at the button
         self.observations = list()
 
         self.total_observations = 0
-        self.observations_size = 100  # Only the most relevant observations are kept
-
-        self.confidence = 1/100 # Observations to be sure about a gate is real
+        self.confidence = 0.0
 
         self.id = _id
         self.name = 'Gate'+str(_id)
@@ -52,9 +53,8 @@ class Gate:
 
     def add_marker_observation(self, marker):
 
-
-
         self.total_observations += 1
+
         observation = {}
         observation['pose'] = marker.pose_cov_stamped.pose.pose.pose
         observation['covariance'] = marker.pose_cov_stamped.pose.covariance
@@ -71,7 +71,18 @@ class Gate:
 
         self.observations = sorted(self.observations, key=lambda o: o['weight'], reverse=True)
 
+        self.confidence = self._calc_confidence()
+
         #print(self.observations[0])
+
+    def _calc_confidence(self):
+        # [0,1] Confidence based on observations to be sure about a gate is real
+        #confidence = self.total_observations / self.observations_size
+
+        confidence = len(self.observations) / float(self.observations_size)
+        if confidence > 1.0: confidence = 1.0
+
+        return confidence
 
     def get_best_pose_estimation(self):
 
@@ -96,7 +107,8 @@ class GateMap:
 
     def __init__(self):
         self.gates = list()
-        self.d_threshold = 3  # group observation when closer than threshold
+        # TODO: move to params
+        self.d_threshold = 3  # cluster observation when closer than threshold by euclidean distance in meters
 
     def process_marker_observation(self, marker):
 
@@ -110,7 +122,7 @@ class GateMap:
 
         for g in self.gates:
 
-            print(g.name, g.total_observations)
+            print(g.name, g.total_observations, g.confidence)
 
             if g.euclidean_distance_observation(marker) < self.d_threshold:
                 g.add_marker_observation(marker)
@@ -163,24 +175,27 @@ class SubscriberPublisherObservations:
 
     def _build_gate_messages_and_publish(self):
 
-        _world_frame_id = 'world'
+        #TODO: move to params
+        _confidence_threshold = 0.05  # Ignore gates with lower confidence than threshold
 
         if len(self.gates_map.gates) == 0: return False
 
         marker_viz_array = MarkerArray()
         pose_array = PoseArray()
-        pose_array.header.frame_id = _world_frame_id
+        pose_array.header.frame_id = self.fixed_frame_id
 
         for g in self.gates_map.gates:
+
+            if g.confidence < _confidence_threshold: continue
 
             pose = g.get_best_pose_estimation()
             gate_id = g.id
 
-
             pose_array.poses.append(pose)
 
-            marker_msg = self._create_gate_rviz_marker(pose, gate_id, _world_frame_id)
-            label_msg = self._create_gate_rviz_label(pose, gate_id, g.name, _world_frame_id)
+            marker_msg = self._create_gate_rviz_marker(pose, gate_id, self.fixed_frame_id)
+            _str_label = "{} {:.0f}%".format(g.name, g.confidence*100)
+            label_msg = self._create_gate_rviz_label(pose, gate_id, _str_label, self.fixed_frame_id)
             marker_viz_array.markers.append(label_msg)
             marker_viz_array.markers.append(marker_msg)
 
@@ -235,8 +250,8 @@ class SubscriberPublisherObservations:
         #marker.scale.y = 1
         marker.scale.z = 0.5
 
-        marker.color.r = 0.0
-        marker.color.g = 0.0
+        marker.color.r = 1.0
+        marker.color.g = 1.0
         marker.color.b = 1.0
         marker.color.a = 0.75
 
