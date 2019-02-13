@@ -112,7 +112,7 @@ trajectory_length: {trajectory_length}""".format(**config))
         
         # TODO: determine appropriate speeds based on start speed, max speed, and max acceleration (centripetal acceleration limits speed on tight curve)
         # For now just use constant speed of self.max_speed.
-        ds = 0.2
+        ds = self.ds
         trajectory_points = []
         def visit_cb(pt, deriv1, deriv2, s):
             # curvature is calcuated as norm(deriv1 x deriv2) / norm(deriv1)**3
