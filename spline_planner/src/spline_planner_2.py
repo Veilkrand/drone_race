@@ -28,7 +28,7 @@ class SplinePlanner():
         self.odometry = None
         self.min_speed = 0.1
         self.max_speed = rospy.get_param("~target_exit_speed", 1.0)
-        self.max_acceleration = 0.1 # Racing drone is probably around 10 m/s2. Set very low for now.
+        self.max_acceleration = 3 # Racing drone is probably around 10 m/s2. Set very low for now.
         self.gates_sub = rospy.Subscriber('gt_gates_publisher/gt_gates', PoseArray, self.gates_callback)
         self.odometry_sub = rospy.Subscriber('/' + self._namespace + '/odometry_sensor1/odometry', Odometry, self.odometry_callback)
         self.traj_pub = rospy.Publisher('/' + _namespace + '/command/trajectory', MultiDOFJointTrajectory, queue_size=1, latch=True)
@@ -95,7 +95,7 @@ class SplinePlanner():
         
         # TODO: determine appropriate speeds based on start speed, max speed, and max acceleration (centripetal acceleration limits speed on tight curve)
         # For now just use constant speed of self.max_speed.
-        ds = 0.1
+        ds = 0.2
         trajectory_points = []
         def visit_cb(pt, deriv1, deriv2, s):
             # curvature is calcuated as norm(deriv1 x deriv2) / norm(deriv1)**3
@@ -114,7 +114,7 @@ class SplinePlanner():
                 'speed_direction': Vector3(*((deriv1 / norm_d1).tolist())),
                 'curvature': c
             })
-        path.visit_at_interval(ds, visit_cb, ds * 60)
+        path.visit_at_interval(ds, visit_cb, ds * 50)
 #        trajectory_points = [{'s': i * ds, 'speed': self.max_speed, 'curvature': geo.spline_distance_to_curvature(waypoint_spline, i*ds)} for i in range(30)]
         vmin = self.min_speed
         vmax = self.max_speed
@@ -125,8 +125,10 @@ class SplinePlanner():
             if centripetal >= amax:
                 return max(vmin, min(vmax, math.sqrt(abs(amax / curvature))))
             remaining_acceleration = math.sqrt(amax**2 - centripetal**2)
-            dt = ds / max(vmin, speed_neighbor)
-            return max(vmin, min(vmax, speed_neighbor + dt * remaining_acceleration))
+            # see /Planning Motion Trajectories for Mobile Robots Using Splines/
+            # (refered as Sprunk[2008] later) for more details (eq 3.21)
+            v_this = math.sqrt(speed_neighbor ** 2 + 2 * ds * remaining_acceleration)
+            return max(vmin, min(vmax, v_this))
 
         trajectory_points[0]['speed'] = min(vmax, max(vmin, geo.magnitude_vector(start_velocity)))
         num_traj = len(trajectory_points)
@@ -146,6 +148,7 @@ class SplinePlanner():
         trajectory_points[0]['time'] = 0.0
         for i in range(num_traj - 1):
             prev_time = trajectory_points[i]['time']
+            # see eq 3.20
             ave_speed = 0.5 * (trajectory_points[i]['speed'] + trajectory_points[i+1]['speed'])
             trajectory_points[i+1]['time'] = prev_time + ds / ave_speed
 
@@ -172,8 +175,8 @@ class SplinePlanner():
         trajectory.header.frame_id=''
         trajectory.header.stamp = start_time
         trajectory.joint_names = ['base']
-        for point in trajectory_points:
-            distance = i * ds
+        # remove the first trajectory point (current poisition)
+        for point in trajectory_points[1:]:
             transform = Transform()
             transform.translation = point['point']
             # TODO: transform.rotation
@@ -183,7 +186,7 @@ class SplinePlanner():
             acceleration = Twist()
             acceleration.linear = point['acceleration']
             # TODO: acceleration.angular
-            trajectory.points.append(MultiDOFJointTrajectoryPoint([transform], [velocity], [acceleration], rospy.Duration(distance / self.max_speed)))
+            trajectory.points.append(MultiDOFJointTrajectoryPoint([transform], [velocity], [acceleration], rospy.Duration(point['time'])))
 
         return trajectory
 
