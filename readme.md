@@ -9,7 +9,14 @@
 See more detailed installation instructions in
 [install.md](https://github.com/Veilkrand/drone_race/blob/master/install.md).
 
-## Run environment
+## Test Launch Files:
+
+- Launch RotorS msf with Gazebo, Rviz, spline planner and ground truth gates:
+
+`$ roslaunch drone_race_common rotors_rviz_spline_gt.launch`
+
+
+## Run environment (for Waypoint Controller)
 
 1. Launch Gazebo with test track, and RotorS plugins:
   * With vi camera`$ roslaunch gazebo_assets_drone_race test_rotors_msf_camera.launch`
