@@ -15,7 +15,7 @@
     </node>
 
     <!-- rviz node -->
-    <node pkg="rviz" type="rviz" name="rviz" args="-d $(find drone_map_builder)/configs/solution.rviz" if="$(arg rviz)"/>
+    <node pkg="rviz" type="rviz" name="rviz" args="-d $(find drone_race_common)/configs/solution.rviz" if="$(arg rviz)"/>
 
     <!-- trajectory visualization topic publisher -->
     <node pkg="spline_planner" type="trajectory_visualizer.py" name="traj_viz">
