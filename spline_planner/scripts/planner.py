@@ -119,16 +119,40 @@ trajectory_length: {trajectory_length}""".format(**config))
             # see: https://en.wikipedia.org/wiki/Curvature#Local_expressions_2
             d1xd2 = np.cross(deriv1, deriv2)
             norm_d1 = np.linalg.norm(deriv1)
-            c = np.linalg.norm(d1xd2) / norm_d1 ** 3
+            norm_d2 = np.linalg.norm(deriv2)
+            if norm_d1 > 1e-5:
+                c = np.linalg.norm(d1xd2) / norm_d1 ** 3
+            else:
+                c = 0
             # the first order derivative is given as ds/dt, where s is the arc length and t is the internal parameter of the spline,
             # not time.
             # because of this, the magnitude of first order derivative is not the same with viable speed,
             # but nevertheless, the direction of the derivative of them are the same.
+
+            # also note that unit normal vector at point is just the second order derivative,
+            # and it is in the opposite direction of the radius vector
+
+            # the cross product of unit tangent vector and unit normal vector
+            # is also mentioned as unit binormal vector
+            if norm_d1 > 1e-5:
+                unit_d1 = deriv1 / norm_d1
+            else:
+                unit_d1 = np.array([0.0, 0.0, 0.0])
+                
+            if norm_d2 > 1e-5:
+                unit_d2 = deriv2 / norm_d2
+            else:
+                unit_d2 = np.array([0.0, 0.0, 0.0])
+                
+            unit_binormal = np.cross(unit_d1, unit_d2)
+            
             trajectory_points.append({
                 's': s,
                 'point': Vector3(*(pt.tolist())),
                 'speed': self.max_speed,
-                'speed_direction': Vector3(*((deriv1 / norm_d1).tolist())),
+                'speed_direction': Vector3(*(unit_d1.tolist())),
+                'unit_normal': Vector3(*(unit_d2.tolist())),
+                'unit_binormal': Vector3(*(unit_binormal.tolist())),
                 'curvature': c
             })
         path.visit_at_interval(ds, visit_cb, self.trajectory_length)
@@ -160,6 +184,14 @@ trajectory_length: {trajectory_length}""".format(**config))
         # Set velocity based on speed and direction
         for point in trajectory_points:
             point['velocity'] = geo.scalar_multiply(point['speed'], point['speed_direction'])
+            # the relationship between angular velocity and linear velocity is:
+            # \omega = r x v / || r ||^2
+            # where r is the radius vector, v is linear velocity.
+            # see: https://en.wikipedia.org/wiki/Angular_velocity#Particle_in_three_dimensions
+            # note: with the anti-commutative law of cross product,
+            # unit binomal = v x (-r) / (||v|| * ||r||) = r x v / (||v|| * ||r||)
+            omega = geo.scalar_multiply(geo.magnitude_vector(point['velocity']) * point['curvature'], point['unit_binormal'])
+            point['omega'] = omega
 
         # Set time based on speed and distance
         trajectory_points[0]['time'] = 0.0
@@ -170,17 +202,25 @@ trajectory_length: {trajectory_length}""".format(**config))
             trajectory_points[i+1]['time'] = prev_time + ds / ave_speed
 
         # Set acceleration based on change in velocity
-        dt = trajectory_points[1]['time']
-        deltav = geo.vector_from_to(trajectory_points[0]['velocity'], trajectory_points[1]['velocity'])
-        trajectory_points[0]['acceleration'] = geo.scalar_multiply(1.0/dt, deltav)
-        for i in range(num_traj - 2):
-            j = i + 1 # iterate skipping both ends
-            dt = trajectory_points[j+1]['time'] - trajectory_points[j-1]['time']
-            deltav = geo.vector_from_to(trajectory_points[j-1]['velocity'], trajectory_points[j+1]['velocity'])
-            trajectory_points[j]['acceleration'] = geo.scalar_multiply(1.0/dt, deltav)
-        dt = trajectory_points[-1]['time'] - trajectory_points[-2]['time']
-        deltav = geo.vector_from_to(trajectory_points[-2]['velocity'], trajectory_points[-1]['velocity'])
-        trajectory_points[0-1]['acceleration'] = geo.scalar_multiply(1.0/dt, deltav)
+        # we're assuming constant accelerations between waypoints,
+        # a is just \delta V / \delta t
+        for i in range(num_traj - 1):
+            t_current = trajectory_points[i]['time']
+            t_next = trajectory_points[i + 1]['time']
+            dt = t_next - t_current
+            
+            v_current = trajectory_points[i]['velocity']
+            v_next = trajectory_points[i + 1]['velocity']
+            dv = geo.vector_from_to(v_current, v_next)
+            
+            w_current = trajectory_points[i]['omega']
+            w_next = trajectory_points[i]['omega']
+            dw = geo.vector_from_to(w_current, w_next)
+            
+            trajectory_points[i]['acceleration'] = geo.scalar_multiply(1.0/dt, dv)
+            trajectory_points[i]['acceleration_w'] = geo.scalar_multiply(1.0/dt, dw)
+        trajectory_points[-1]['acceleration'] = trajectory_points[-2]['acceleration']
+        trajectory_points[-1]['acceleration_w'] = trajectory_points[-2]['acceleration_w']
 
         # TODO: determine thrust direction at each point, based on linear acceleration, centripetal acceleration, gravity, and drag.
         # For now just set accelerations to 0.
@@ -199,10 +239,12 @@ trajectory_length: {trajectory_length}""".format(**config))
             transform.rotation = Quaternion(*(geo.vector_to_quat(point['velocity']).tolist()))
             velocity = Twist()
             velocity.linear = point['velocity']
-            # TODO: velocity.angular
+            velocity.angular = point['omega']
+            
             acceleration = Twist()
             acceleration.linear = point['acceleration']
-            # TODO: acceleration.angular
+            acceleration.angular = point['acceleration_w']
+            
             trajectory.points.append(MultiDOFJointTrajectoryPoint([transform], [velocity], [acceleration], rospy.Duration(point['time'])))
 
         return trajectory
