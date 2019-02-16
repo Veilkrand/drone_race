@@ -2,6 +2,7 @@
 
 #include <ros/ros.h>
 
+#include <mav_msgs/conversions.h>
 #include <mav_msgs/RateThrust.h>
 
 #include <Eigen/Core>
@@ -36,14 +37,6 @@ namespace cascaded_pid_control {
                                       1.0 - 2.0 * (msg.y * msg.y + msg.z * msg.z)));
   }
 
-  inline Eigen::Vector3d EulerRpy(const Eigen::Quaterniond& q) {
-    return Eigen::Vector3d(std::atan2(2.0 * (q.w() * q.x() + q.y() * q.z()),
-                                      1.0 - 2.0 * (q.x() * q.x() + q.y() * q.y())),
-                           std::asin(2.0 * (q.w() * q.y() - q.z() * q.x())),
-                           std::atan2(2.0 * (q.w() * q.z() + q.x() * q.y()),
-                                      1.0 - 2.0 * (q.y() * q.y() + q.z() * q.z())));
-  }
-
   inline geometry_msgs::Vector3 MsgVec3(const Eigen::Vector3d& vec) {
     geometry_msgs::Vector3 result;
     result.x = vec[0];
@@ -62,89 +55,79 @@ namespace cascaded_pid_control {
     return value;
   }
 
-  geometry_msgs::Vector3 CascadedPidControl::AltitudeControl(
-    const geometry_msgs::Pose &pose,
-    const geometry_msgs::Twist &twist,
-    const geometry_msgs::Pose &pose_cmd,
-    const geometry_msgs::Twist &twist_cmd,
-    const geometry_msgs::Vector3 &accel_ff,
+  double CascadedPidControl::AltitudeControl(
+    const mav_msgs::EigenOdometry& current,
+    const mav_msgs::EigenTrajectoryPoint& cmd,
+    const Eigen::Vector3d &accel_ff,
     double dt) {
 
-      Eigen::Matrix3d rot_mat = EigenRotMat(pose.orientation);
+      Eigen::Matrix3d rot_mat = current.orientation_W_B.toRotationMatrix();
 
-      double dz = pose_cmd.position.z - pose.position.z;
-      double dvz = twist_cmd.linear.z - twist.linear.z;
-      double z_dot_dot = kp_z_ * dz + kd_z_ * dvz + accel_ff.z;
+      double dz = cmd.position_W[2] - current.position_W[2];
+      double dvz = cmd.velocity_W[2] - current.getVelocityWorld()[2];
+      double z_dot_dot = kp_z_ * dz + kd_z_ * dvz + accel_ff[2];
 
-      geometry_msgs::Vector3 result;
-      result.z = z_dot_dot * mass_ / rot_mat(2, 2);
+      double result;
+      result = z_dot_dot * mass_ / rot_mat(2, 2);
 
       // clamp value
-      result.z = std::max(0.0, result.z);
-
-      // ROS_INFO_STREAM(dz<<" "<<z_dot_dot<<" "<<result.z);
+      result = std::max(0.0, result);
 
       return result;
   }
 
-  geometry_msgs::Vector3 CascadedPidControl::LateralPositionControl(
-    const geometry_msgs::Pose &pose,
-    const geometry_msgs::Twist &twist,
-    const geometry_msgs::Pose &pose_cmd,
-    const geometry_msgs::Twist &twist_cmd,
-    const geometry_msgs::Vector3 &accel_ff,
+  Eigen::Vector3d CascadedPidControl::LateralPositionControl(
+    const mav_msgs::EigenOdometry& current,
+    const mav_msgs::EigenTrajectoryPoint& cmd,
+    const Eigen::Vector3d& accel_ff,
     double dt) {
 
-    double err_x = pose_cmd.position.x - pose.position.x;
-    double err_y = pose_cmd.position.y - pose.position.y;
+    double err_x = cmd.position_W[0] - current.position_W[0];
+    double err_y = cmd.position_W[1] - current.position_W[1];
 
-    double err_vx = twist_cmd.linear.x - twist.linear.x;
-    double err_vy = twist_cmd.linear.y - twist.linear.y;
+    double err_vx = cmd.velocity_W[0] - current.getVelocityWorld()[0];
+    double err_vy = cmd.velocity_W[1] - current.getVelocityWorld()[1];
     
-    geometry_msgs::Vector3 accel_cmd;
-    accel_cmd.x = Constrain(kp_x_ * err_x + kd_x_ * err_vx + accel_ff.x, -max_abs_accel_x_, max_abs_accel_x_);
-    accel_cmd.y = Constrain(kp_y_ * err_y + kd_y_ * err_vy + accel_ff.y, -max_abs_accel_y_, max_abs_accel_y_);
+    Eigen::Vector3d result;
+    result << Constrain(kp_x_ * err_x + kd_x_ * err_vx + accel_ff[0], -max_abs_accel_x_, max_abs_accel_x_),
+              Constrain(kp_y_ * err_y + kd_y_ * err_vy + accel_ff[1], -max_abs_accel_y_, max_abs_accel_y_),
+              0;
 
-    // ROS_INFO_STREAM("x: err: "<<err_x<<" cmd: "<<accel_cmd.x);
-    // ROS_INFO_STREAM("y: err: "<<err_y<<" cmd: "<<accel_cmd.y);
-    return accel_cmd;
+    return result;
   }
 
-  geometry_msgs::Vector3 CascadedPidControl::AttitudeControl(
-      const geometry_msgs::Pose &pose,
-      const geometry_msgs::Vector3 &accel_cmd,
-      const geometry_msgs::Vector3 &thrust,
+  Eigen::Vector3d CascadedPidControl::AttitudeControl(
+      const mav_msgs::EigenOdometry& pose,
+      const Eigen::Vector3d& accel_cmd,
+      double thrust_cmd,
       double dt) {
-    Eigen::Matrix3d rot_mat = EigenRotMat(pose.orientation);
+    Eigen::Matrix3d rot_mat = pose.orientation_W_B.toRotationMatrix();
 
     double bx = rot_mat(0, 2);
     double by = rot_mat(1, 2);
     
-    double c = thrust.z / mass_;
-    double bx_cmd = accel_cmd.x / c;
-    double by_cmd = accel_cmd.y / c;
+    double c = thrust_cmd / mass_;
+    double bx_cmd = accel_cmd[0] / c;
+    double by_cmd = accel_cmd[1] / c;
 
     double bx_dot = kp_pitch_ * (bx_cmd - bx);
     double by_dot = kp_roll_ * (by_cmd - by);
 
     double k = 1.0 / rot_mat(2, 2);
-    geometry_msgs::Vector3 pq_rate_cmd;
-    pq_rate_cmd.x = k * (rot_mat(1, 0) * bx_dot - rot_mat(0, 0) * by_dot);
-    pq_rate_cmd.y = k * (rot_mat(1, 1) * bx_dot - rot_mat(0, 1) * by_dot);
-
-    // ROS_INFO_STREAM("p rate: "<<pq_rate_cmd.x<<"  y accel: "<<accel_cmd.y);
-    // ROS_INFO_STREAM("q rate: "<<pq_rate_cmd.y<<"  x accel: "<<accel_cmd.x);
+    Eigen::Vector3d pq_rate_cmd;
+    pq_rate_cmd << k * (rot_mat(1, 0) * bx_dot - rot_mat(0, 0) * by_dot),
+                   k * (rot_mat(1, 1) * bx_dot - rot_mat(0, 1) * by_dot),
+                   0;
 
     return pq_rate_cmd;
   }
 
   double CascadedPidControl::YawControl(
-    const geometry_msgs::Pose &pose,
-    const double yaw_cmd,
+    const mav_msgs::EigenOdometry& current,
+    double yaw_cmd,
     double dt) {
-    double current_yaw = EulerRpy(pose.orientation)[2];
+    double current_yaw = current.getYaw();
     double err_yaw = yaw_cmd - current_yaw;
-    // ROS_INFO("current: %.2f, targeted: %.2f, error: %.2f", current_yaw, yaw_cmd, err_yaw);
     while (err_yaw > PI) {
       err_yaw -= 2 * PI;
     }
@@ -155,36 +138,27 @@ namespace cascaded_pid_control {
   }
 
   void CascadedPidControl::OdometryCallback(const nav_msgs::OdometryConstPtr &ptr) {
-    const geometry_msgs::Pose &current_pose = ptr->pose.pose;
-    const geometry_msgs::Twist &current_twist = ptr->twist.twist;
-    geometry_msgs::Pose pose_cmd;
-    pose_cmd.orientation.w = 1;
-    pose_cmd.position.z = 3;
-    geometry_msgs::Twist twist_cmd;
-    geometry_msgs::Vector3 accel_ff;
-    accel_ff.x = 0;
-    accel_ff.y = 0;
-    accel_ff.z = GRAVITY_CONST;
+    if (controller_active_) {
+      mav_msgs::EigenOdometry current;
+      mav_msgs::eigenOdometryFromMsg(*ptr, &current);
+      double current_time = ptr->header.stamp.toSec();
+      double dt = current_time - last_odometry_time_;
 
-    double current_time = ptr->header.stamp.toSec();
-    double dt = current_time - last_odometry_time_;
+      double thrust = AltitudeControl(current, curr_point_, default_ff_, dt);
+      Eigen::Vector3d accel_cmd = LateralPositionControl(current, curr_point_, default_ff_, dt);
+      Eigen::Vector3d pqr_rate_cmd = AttitudeControl(current, accel_cmd, thrust, dt);
+      pqr_rate_cmd[2] = YawControl(current, curr_point_.getYaw(), dt);
 
-    double yaw_cmd = EulerRpy(pose_cmd.orientation)[2];
+      // control command is published as mav_msgs/RateThrust
+      mav_msgs::RateThrust rate_thrust;
+      rate_thrust.header.stamp = ros::Time::now();
+      rate_thrust.header.frame_id = "uav/imu";
+      rate_thrust.thrust.z = thrust;
+      mav_msgs::vectorEigenToMsg(pqr_rate_cmd, &rate_thrust.angular_rates);
 
-    geometry_msgs::Vector3 thrust = AltitudeControl(current_pose, current_twist, pose_cmd, twist_cmd, accel_ff, dt);
-    geometry_msgs::Vector3 accel_cmd = LateralPositionControl(current_pose, current_twist, pose_cmd, twist_cmd, accel_ff, dt);
-    geometry_msgs::Vector3 pqr_rate_cmd = AttitudeControl(current_pose, accel_cmd, thrust, dt);
-    pqr_rate_cmd.z = YawControl(current_pose, yaw_cmd, dt);
-
-    // control command is published as mav_msgs/RateThrust
-    mav_msgs::RateThrust rate_thrust;
-    rate_thrust.header.stamp = ros::Time::now();
-    rate_thrust.header.frame_id = "uav/imu";
-    rate_thrust.thrust = thrust;
-    rate_thrust.angular_rates = pqr_rate_cmd;
-    rate_thrust_pub_.publish(rate_thrust);
-
-    last_odometry_time_ = current_time;
+      rate_thrust_pub_.publish(rate_thrust);
+      last_odometry_time_ = current_time;
+    }
   }
 
   void CascadedPidControl::Init() {
@@ -192,10 +166,17 @@ namespace cascaded_pid_control {
     cb = boost::bind(&CascadedPidControl::DynamicReconfigureCallback, this, _1, _2);
     server_.setCallback(cb);
 
+    controller_active_ = false;
+    last_odometry_time_ = 0;
+    default_ff_ << 0, 0, GRAVITY_CONST;
+
     rate_thrust_pub_ = private_nh_.advertise<mav_msgs::RateThrust>("rateThrust", 1);
     odometry_sub_ = private_nh_.subscribe<nav_msgs::Odometry>("odometry", 1, &CascadedPidControl::OdometryCallback, this);
+    trajectory_sub_ = private_nh_.subscribe<trajectory_msgs::MultiDOFJointTrajectory>("trajectory", 1, &CascadedPidControl::TrajectoryCallback, this);
 
-    ROS_INFO("Cascaded PID control node initialized.");
+    timer_ = nh_.createTimer(ros::Duration(0), &CascadedPidControl::TimerCallback, this, true, false);
+
+    ROS_INFO("Cascaded PID control node initialized. Waiting for trajectory.");
   }
 
   void CascadedPidControl::Destroy() {
@@ -225,6 +206,64 @@ namespace cascaded_pid_control {
 
     if (config.rp_same_params) {
       config.kp_pitch = kp_pitch_ = kp_roll_;
+    }
+  }
+
+  void CascadedPidControl::TrajectoryCallback(const trajectory_msgs::MultiDOFJointTrajectoryConstPtr& ptr) {
+    timer_.stop();
+    traj_points_.clear();
+    command_wait_time_.clear();
+
+    if (ptr->points.size() == 0) {
+      ROS_WARN("Empty trajectory.");
+      return;
+    }
+
+    ROS_INFO("New trajectory arrived.");
+
+    auto iter = ptr->points.begin();
+    double last_time = iter->time_from_start.toSec();
+    command_wait_time_.push_back(last_time);
+    mav_msgs::EigenTrajectoryPoint eigen_traj_point;
+    mav_msgs::eigenTrajectoryPointFromMsg(*iter, &eigen_traj_point);
+    traj_points_.push_back(eigen_traj_point);
+
+    for (++iter; iter != ptr->points.end(); ++iter) {
+      double traj_time = iter->time_from_start.toSec();
+      command_wait_time_.push_back(traj_time - last_time);
+      mav_msgs::eigenTrajectoryPointFromMsg(*iter, &eigen_traj_point);
+      traj_points_.push_back(eigen_traj_point);
+
+      last_time = traj_time;
+    }
+
+    curr_point_ = traj_points_.front();
+    traj_points_.pop_front();
+
+    if (!traj_points_.empty()) {
+      double wait_time = command_wait_time_.front();
+      command_wait_time_.pop_front();
+      timer_.setPeriod(ros::Duration(wait_time));
+      timer_.start();
+    }
+
+    controller_active_ = true;
+  }
+
+  void CascadedPidControl::TimerCallback(const ros::TimerEvent& e) {
+    if (traj_points_.empty()) {
+      ROS_INFO("All trajectory commands have beed carried out.");
+      return;
+    }
+
+    curr_point_ = traj_points_.front();
+    traj_points_.pop_front();
+    if (!traj_points_.empty()) {
+      double wait_time = command_wait_time_.front();
+      command_wait_time_.pop_front();
+      timer_.stop();
+      timer_.setPeriod(ros::Duration(wait_time));
+      timer_.start();
     }
   }
 

@@ -6,6 +6,7 @@
 #include <nav_msgs/Odometry.h>
 #include <geometry_msgs/PoseStamped.h>
 #include <tf2_ros/transform_listener.h>
+#include <tf2_geometry_msgs/tf2_geometry_msgs.h>
 
 #include "base_node.hpp"
 
@@ -40,12 +41,17 @@ namespace cascaded_pid_control {
       odometry.pose.pose.position.z = transform_stamped.transform.translation.z;
       odometry.pose.pose.orientation = transform_stamped.transform.rotation;
       
-      double current = odometry.header.stamp.toSec();      
+      double current = odometry.header.stamp.toSec();
       if (last_odometry_time_ > 0) {
-	double dt = current - last_odometry_time_;
-	odometry.twist.twist.linear.x = (odometry.pose.pose.position.x - last_position_.x) / dt;
-	odometry.twist.twist.linear.y = (odometry.pose.pose.position.y - last_position_.y) / dt;
-	odometry.twist.twist.linear.z = (odometry.pose.pose.position.z - last_position_.z) / dt;
+	      double dt = current - last_odometry_time_;
+        // note: velocities info in twist message is encoded in body frame.
+        geometry_msgs::Twist twist_world;
+	      twist_world.linear.x = (odometry.pose.pose.position.x - last_position_.x) / dt;
+	      twist_world.linear.y = (odometry.pose.pose.position.y - last_position_.y) / dt;
+	      twist_world.linear.z = (odometry.pose.pose.position.z - last_position_.z) / dt;
+        
+        geometry_msgs::TransformStamped transform_stamped_inverse = buffer_.lookupTransform("uav/imu", "world", ros::Time(0));
+        tf2::doTransform(twist_world.linear, odometry.twist.twist.linear, transform_stamped_inverse);
       }
       odometry_pub_.publish(odometry);
 

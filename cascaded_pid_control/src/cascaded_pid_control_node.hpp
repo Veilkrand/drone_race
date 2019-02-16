@@ -1,11 +1,15 @@
 #ifndef _CASCADED_PID_CONTROL_CASCADED_PID_CONTROL_NODE_
 #define _CASCADED_PID_CONTROL_CASCADED_PID_CONTROL_NODE_
 
+#include <deque>
+
 #include <geometry_msgs/Pose.h>
 #include <geometry_msgs/Twist.h>
 #include <geometry_msgs/Vector3.h>
 #include <geometry_msgs/Quaternion.h>
+#include <mav_msgs/eigen_mav_msgs.h>
 #include <nav_msgs/Odometry.h>
+#include <trajectory_msgs/MultiDOFJointTrajectory.h>
 #include <dynamic_reconfigure/server.h>
 #include <cascaded_pid_control/CascadedPidConfig.h>
 #include "base_node.hpp"
@@ -27,64 +31,58 @@ namespace cascaded_pid_control {
     void DynamicReconfigureCallback(CascadedPidConfig &config, uint32_t level);
 
     void OdometryCallback(const nav_msgs::OdometryConstPtr &ptr);
+    void TrajectoryCallback(const trajectory_msgs::MultiDOFJointTrajectoryConstPtr& ptr);
+
+    void TimerCallback(const ros::TimerEvent& e);
 
     /**
-     * @param pose current pose in NWU
-     * @param twist current velocity in NWU
-     * @param pose_cmd commanded pose in NWU. only the z component is used.
-     * @param twist_cmd velocity in NWU. only the z component is used.
+     * @param current current odometry in NWU
+     * @param cmd commanded point in NWU. only the z component is used.
      * @param accel_ff feed forward acceleration in NWU. only the z component is used.
      * @param dt time difference of measurements
-     * @return collective thrust commanded. since thrust is always measured in 
-     *         body frame, the x & y component of it is always zero.
+     * @return collective thrust
      */
-    geometry_msgs::Vector3 AltitudeControl(
-      const geometry_msgs::Pose &pose,
-      const geometry_msgs::Twist &twist,
-      const geometry_msgs::Pose &pose_cmd,
-      const geometry_msgs::Twist &twist_cmd,
-      const geometry_msgs::Vector3 &accel_ff,
+    double AltitudeControl(
+      const mav_msgs::EigenOdometry& current,
+      const mav_msgs::EigenTrajectoryPoint& cmd,
+      const Eigen::Vector3d& accel_ff,
       double dt);
 
     /**
-     * @param pose current pose in NWU
-     * @param twist current velocity in NWU
-     * @param pose_cmd commanded pose in NWU. z component is ignored.
-     * @param twist_cmd velocity in NWU. z component is ignored.
+     * @param current current odometry in NWU
+     * @param cmd commanded point in NWU. z component is ignored.
      * @param accel_ff feed forward acceleration in NWU. z component is ignored.
      * @param dt time difference of measurements
-     * @return lateral acceleration command
+     * @return lateral acceleration command in NWU (z component is always 0)
      */
-    geometry_msgs::Vector3 LateralPositionControl(
-      const geometry_msgs::Pose &pose,
-      const geometry_msgs::Twist &twist,
-      const geometry_msgs::Pose &pose_cmd,
-      const geometry_msgs::Twist &twist_cmd,
-      const geometry_msgs::Vector3 &accel_ff,
+    Eigen::Vector3d LateralPositionControl(
+      const mav_msgs::EigenOdometry& current,
+      const mav_msgs::EigenTrajectoryPoint& cmd,
+      const Eigen::Vector3d& accel_ff,
       double dt);
 
     /**
-     * @param pose current pose in NWU
+     * @param current current odometry in NWU
      * @param accel_cmd linear acceleration command in NWU
-     * @param thrust thrust command in body frame
+     * @param thrust thrust command (always in body frame)
      * @param dt time difference of measurements
-     * @return body rate command (except yaw rate command)
+     * @return body rate command (except yaw rate. always 0)
      */
-    geometry_msgs::Vector3 AttitudeControl(
-      const geometry_msgs::Pose &pose,
-      const geometry_msgs::Vector3 &accel_cmd,
-      const geometry_msgs::Vector3 &thrust,
+    Eigen::Vector3d AttitudeControl(
+      const mav_msgs::EigenOdometry& current,
+      const Eigen::Vector3d& accel_cmd,
+      double thrust_cmd,
       double dt);
 
     /**
-     * @param pose current pose in NWU
+     * @param current current odometry in NWU
      * @param yaw_cmd yaw command
      * @param dt time difference of measurements
      * @return yaw rate command
      */
     double YawControl(
-      const geometry_msgs::Pose &pose,
-      const double yaw_cmd,
+      const mav_msgs::EigenOdometry& current,
+      double yaw_cmd,
       double dt);
 
     private:
@@ -108,6 +106,18 @@ namespace cascaded_pid_control {
     ros::Publisher rate_thrust_pub_;
     ros::Subscriber odometry_sub_;
 
+    ros::Subscriber trajectory_sub_;
+    // timer for picking up trajectory point
+    ros::Timer timer_;
+    // dequeue storing issued trajectory points
+    std::deque<mav_msgs::EigenTrajectoryPoint> traj_points_;
+    std::deque<double> command_wait_time_;
+
+    // current trajectory point
+    mav_msgs::EigenTrajectoryPoint curr_point_;
+    bool controller_active_;
+
+    Eigen::Vector3d default_ff_;
   };
 
 }
