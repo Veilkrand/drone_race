@@ -27,6 +27,23 @@ namespace cascaded_pid_control {
     return Eigen::Vector3d(msg.x, msg.y, msg.z);
   }
 
+  inline Eigen::Vector3d EulerRpy(const geometry_msgs::Quaternion& msg) {
+    // see: https://en.wikipedia.org/wiki/Conversion_between_quaternions_and_Euler_angles#Quaternion%20to%20Euler%20Angles%20Conversion
+    return Eigen::Vector3d(std::atan2(2.0 * (msg.w * msg.x + msg.y * msg.z),
+                                      1.0 - 2.0 * (msg.x * msg.x + msg.y * msg.y)),
+                           std::asin(2.0 * (msg.w * msg.y - msg.z * msg.x)),
+                           std::atan2(2.0 * (msg.w * msg.z + msg.x * msg.y),
+                                      1.0 - 2.0 * (msg.y * msg.y + msg.z * msg.z)));
+  }
+
+  inline Eigen::Vector3d EulerRpy(const Eigen::Quaterniond& q) {
+    return Eigen::Vector3d(std::atan2(2.0 * (q.w() * q.x() + q.y() * q.z()),
+                                      1.0 - 2.0 * (q.x() * q.x() + q.y() * q.y())),
+                           std::asin(2.0 * (q.w() * q.y() - q.z() * q.x())),
+                           std::atan2(2.0 * (q.w() * q.z() + q.x() * q.y()),
+                                      1.0 - 2.0 * (q.y() * q.y() + q.z() * q.z())));
+  }
+
   inline geometry_msgs::Vector3 MsgVec3(const Eigen::Vector3d& vec) {
     geometry_msgs::Vector3 result;
     result.x = vec[0];
@@ -125,8 +142,9 @@ namespace cascaded_pid_control {
     const geometry_msgs::Pose &pose,
     const double yaw_cmd,
     double dt) {
-    double current_yaw = EigenRotMat(pose.orientation).eulerAngles(2, 1, 0)[0];
+    double current_yaw = EulerRpy(pose.orientation)[2];
     double err_yaw = yaw_cmd - current_yaw;
+    ROS_INFO("current: %.2f, targeted: %.2f, error: %.2f", current_yaw, yaw_cmd, err_yaw);
     while (err_yaw > PI) {
       err_yaw -= 2 * PI;
     }
@@ -151,7 +169,7 @@ namespace cascaded_pid_control {
     double current_time = ptr->header.stamp.toSec();
     double dt = current_time - last_odometry_time_;
 
-    double yaw_cmd = EigenRotMat(pose_cmd.orientation).eulerAngles(2, 1, 0)[0];
+    double yaw_cmd = EulerRpy(pose_cmd.orientation)[2];
 
     geometry_msgs::Vector3 thrust = AltitudeControl(current_pose, current_twist, pose_cmd, twist_cmd, accel_ff, dt);
     geometry_msgs::Vector3 accel_cmd = LateralPositionControl(current_pose, current_twist, pose_cmd, twist_cmd, accel_ff, dt);
@@ -210,3 +228,4 @@ namespace cascaded_pid_control {
 }
 
 XROS_RUNNABLE_NODE_MAIN(cascaded_pid_control::CascadedPidControl)
+
