@@ -121,3 +121,26 @@ rosrun drone_map_builder gt_gates_publisher_node.py $ rosrun drone_map_builder o
 ```sh
 rviz -d $(rospack find drone_map_builder)/configs/default.rviz
 ```
+
+#### About cascaded_pid_control package
+
+The cascaded pid control package is written w.r.t. MIT FlightGoggles simulator. To run it, you don't need to bring up gazebo simulation (MIT FlightGoggles is similar to gazebo).
+
+cascaded_pid_control package contains 2 node:
+
+1. `cascaded_pid_control` This is the main node implementing a cascaded pid controller.
+2. `cheat_node` This is a node turning groundtruth pose information into `nav_msgs/Odometry`. Note that this node use ground truth information and is not allowed to use in the final solution (thus it is named with `cheat`).
+
+There's a launch file that can start the two nodes in one command. After building and sourcing the full workspace, run:
+
+```sh
+$ roslaunch cascaded_pid_control cascaded_pid_control_gt.launch
+```
+
+If you want to use estimated odometry instead of the cheating ground truth, you can start the `cascaded_pid_control` node only and remap the input topic to the actual `nav_msgs/Odometry` message:
+
+```sh
+$ rosrun cascaded_pid_control cascaded_pid_control /CascadedPidControl/rateThrust:=/uav/input/rateThrust /CascadedPidControl/odometry:=/the/actual/odometry/topic
+```
+
+Currently estimated odometry is not ready so you can only work with the cheat odometry.
