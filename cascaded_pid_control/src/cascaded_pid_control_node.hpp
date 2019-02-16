@@ -92,15 +92,17 @@ namespace cascaded_pid_control {
     double mass_;
     double kp_x_;
     double kd_x_;
+    double max_abs_accel_x_;
     double kp_y_;
     double kd_y_;
+    double max_abs_accel_y_;
     double kp_z_;
     double kd_z_;
     double kp_roll_;
     double kp_pitch_;
     double kp_yaw_;
 
-    // member variables
+    // other member variables
     double last_odometry_time_;
     dynamic_reconfigure::Server<CascadedPidConfig> server_;
     ros::Publisher rate_thrust_pub_;

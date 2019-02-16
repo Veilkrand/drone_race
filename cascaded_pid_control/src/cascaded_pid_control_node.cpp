@@ -102,8 +102,8 @@ namespace cascaded_pid_control {
     double err_vy = twist_cmd.linear.y - twist.linear.y;
     
     geometry_msgs::Vector3 accel_cmd;
-    accel_cmd.x = Constrain(kp_x_ * err_x + kd_x_ * err_vx + accel_ff.x, -1, 1);
-    accel_cmd.y = Constrain(kp_y_ * err_y + kd_y_ * err_vy + accel_ff.y, -1, 1);
+    accel_cmd.x = Constrain(kp_x_ * err_x + kd_x_ * err_vx + accel_ff.x, -max_abs_accel_x_, max_abs_accel_x_);
+    accel_cmd.y = Constrain(kp_y_ * err_y + kd_y_ * err_vy + accel_ff.y, -max_abs_accel_y_, max_abs_accel_y_);
 
     // ROS_INFO_STREAM("x: err: "<<err_x<<" cmd: "<<accel_cmd.x);
     // ROS_INFO_STREAM("y: err: "<<err_y<<" cmd: "<<accel_cmd.y);
@@ -144,7 +144,7 @@ namespace cascaded_pid_control {
     double dt) {
     double current_yaw = EulerRpy(pose.orientation)[2];
     double err_yaw = yaw_cmd - current_yaw;
-    ROS_INFO("current: %.2f, targeted: %.2f, error: %.2f", current_yaw, yaw_cmd, err_yaw);
+    // ROS_INFO("current: %.2f, targeted: %.2f, error: %.2f", current_yaw, yaw_cmd, err_yaw);
     while (err_yaw > PI) {
       err_yaw -= 2 * PI;
     }
@@ -207,8 +207,10 @@ namespace cascaded_pid_control {
     mass_ = config.mass;
     kp_x_ = config.kp_x;
     kd_x_ = config.kd_x;
+    max_abs_accel_x_ = config.max_abs_accel_x;
     kp_y_ = config.kp_y;
     kd_y_ = config.kd_y;
+    max_abs_accel_y_ = config.max_abs_accel_y;
     kp_z_ = config.kp_z;
     kd_z_ = config.kd_z;
     kp_roll_ = config.kp_roll;
@@ -218,6 +220,7 @@ namespace cascaded_pid_control {
     if (config.xy_same_params) {
       config.kp_y = kp_y_ = kp_x_;
       config.kd_y = kd_y_ = kd_x_;
+      config.max_abs_accel_y = max_abs_accel_y_ = max_abs_accel_x_;
     }
 
     if (config.rp_same_params) {
@@ -228,4 +231,3 @@ namespace cascaded_pid_control {
 }
 
 XROS_RUNNABLE_NODE_MAIN(cascaded_pid_control::CascadedPidControl)
-
