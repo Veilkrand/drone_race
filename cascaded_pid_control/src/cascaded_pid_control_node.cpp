@@ -121,6 +121,21 @@ namespace cascaded_pid_control {
     return pq_rate_cmd;
   }
 
+  double CascadedPidControl::YawControl(
+    const geometry_msgs::Pose &pose,
+    const double yaw_cmd,
+    double dt) {
+    double current_yaw = EigenRotMat(pose.orientation).eulerAngles(2, 1, 0)[0];
+    double err_yaw = yaw_cmd - current_yaw;
+    while (err_yaw > PI) {
+      err_yaw -= 2 * PI;
+    }
+    while (err_yaw < -PI) {
+      err_yaw += 2 * PI;
+    }
+    return kp_yaw_ * err_yaw;
+  }
+
   void CascadedPidControl::OdometryCallback(const nav_msgs::OdometryConstPtr &ptr) {
     const geometry_msgs::Pose &current_pose = ptr->pose.pose;
     const geometry_msgs::Twist &current_twist = ptr->twist.twist;
@@ -136,16 +151,19 @@ namespace cascaded_pid_control {
     double current_time = ptr->header.stamp.toSec();
     double dt = current_time - last_odometry_time_;
 
+    double yaw_cmd = EigenRotMat(pose_cmd.orientation).eulerAngles(2, 1, 0)[0];
+
     geometry_msgs::Vector3 thrust = AltitudeControl(current_pose, current_twist, pose_cmd, twist_cmd, accel_ff, dt);
     geometry_msgs::Vector3 accel_cmd = LateralPositionControl(current_pose, current_twist, pose_cmd, twist_cmd, accel_ff, dt);
-    geometry_msgs::Vector3 pq_rate_cmd = AttitudeControl(current_pose, accel_cmd, thrust, dt);
+    geometry_msgs::Vector3 pqr_rate_cmd = AttitudeControl(current_pose, accel_cmd, thrust, dt);
+    pqr_rate_cmd.z = YawControl(current_pose, yaw_cmd, dt);
 
     // control command is published as mav_msgs/RateThrust
     mav_msgs::RateThrust rate_thrust;
     rate_thrust.header.stamp = ros::Time::now();
     rate_thrust.header.frame_id = "uav/imu";
     rate_thrust.thrust = thrust;
-    rate_thrust.angular_rates = pq_rate_cmd;
+    rate_thrust.angular_rates = pqr_rate_cmd;
     rate_thrust_pub_.publish(rate_thrust);
 
     last_odometry_time_ = current_time;

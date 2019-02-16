@@ -13,6 +13,7 @@
 namespace cascaded_pid_control {
 
   constexpr double GRAVITY_CONST = 9.8;
+  constexpr double PI = 3.14159265358979323846;
 
   class CascadedPidControl : public xros::RunnableNode<CascadedPidControl> {
     public:
@@ -62,11 +63,28 @@ namespace cascaded_pid_control {
       const geometry_msgs::Vector3 &accel_ff,
       double dt);
 
-
+    /**
+     * @param pose current pose in NWU
+     * @param accel_cmd linear acceleration command in NWU
+     * @param thrust thrust command in body frame
+     * @param dt time difference of measurements
+     * @return body rate command (except yaw rate command)
+     */
     geometry_msgs::Vector3 AttitudeControl(
       const geometry_msgs::Pose &pose,
       const geometry_msgs::Vector3 &accel_cmd,
       const geometry_msgs::Vector3 &thrust,
+      double dt);
+
+    /**
+     * @param pose current pose in NWU
+     * @param yaw_cmd yaw command
+     * @param dt time difference of measurements
+     * @return yaw rate command
+     */
+    double YawControl(
+      const geometry_msgs::Pose &pose,
+      const double yaw_cmd,
       double dt);
 
     private:
