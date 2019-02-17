@@ -56,6 +56,7 @@
   <build_depend>tf2_geometry_msgs</build_depend>
   <exec_depend>message_runtime</exec_depend>
   <exec_depend>rospy</exec_depend>
+  <exec_depend>rospkg</exec_depend>  
   <buildtool_depend>catkin</buildtool_depend>  
 
   <!-- The export tag contains other, unspecified, tags -->

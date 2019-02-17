@@ -12,9 +12,9 @@
 
 namespace cascaded_pid_control {
 
-  class CheatNode : public xros::RunnableNode<CheatNode> {
+  class CheatOdometryNode : public xros::RunnableNode<CheatOdometryNode> {
     public:
-    CheatNode(XROS_CONSTRUCTOR_DEFAULT_PARAMETERS) 
+    CheatOdometryNode(XROS_CONSTRUCTOR_DEFAULT_PARAMETERS) 
      : XROS_CONSTRUCTOR_INIT_RUNNABLE,
        tf_listener_(buffer_) { }
 
@@ -71,4 +71,4 @@ namespace cascaded_pid_control {
   
 }
 
-XROS_RUNNABLE_NODE_MAIN_AT_RATE(cascaded_pid_control::CheatNode, 60)
+XROS_RUNNABLE_NODE_MAIN_AT_RATE(cascaded_pid_control::CheatOdometryNode, 60)

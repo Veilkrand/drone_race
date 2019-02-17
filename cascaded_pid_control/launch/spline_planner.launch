@@ -1,0 +1,30 @@
+<launch>
+
+  <arg name="rviz" default="1" />
+  <arg name="course" default="'1'" />
+
+  <!-- Planner node -->
+  <node pkg="spline_planner" type="planner.py" name="spline_planner" output="screen">
+    <remap from="/firefly/odometry_sensor1/odometry" to="/CheatOdometryNode/odometry"/>
+    <remap from="/firefly/command/trajectory" to="/CascadedPidControl/trajectory" />
+  </node>
+
+  <!-- Gate pose publisher node (cheat gate pose node) -->
+  <node pkg="cascaded_pid_control" type="cheat_gate_locations_node.py" name="gt_gates_publisher" output="screen">
+    <param name="~course" value="$(arg course)"/>
+  </node>
+
+  <!-- ego trajectory publisher -->
+  <node pkg="drone_map_builder" type="gt_ego_position.py" name="gt_ego_position" output="screen">
+  </node>
+
+  <!-- rviz node -->
+  <node pkg="rviz" type="rviz" name="rviz" args="-d $(find drone_race_common)/configs/solution_flightgoggles.rviz" if="$(arg rviz)"/>
+
+  <!-- trajectory visualization topic publisher -->
+  <node pkg="spline_planner" type="trajectory_visualizer.py" name="traj_viz">
+    <remap from="~trajectory" to="/CascadedPidControl/trajectory"/>
+    <remap from="~odometry" to="/CheatOdometryNode/odometry" />
+  </node>  
+
+</launch>

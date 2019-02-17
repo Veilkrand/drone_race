@@ -139,7 +139,7 @@ include_directories(
 ## With catkin_make all packages are built within a single CMake context
 ## The recommended prefix ensures that target names across packages don't collide
 add_executable(cascaded_pid_control src/cascaded_pid_control_node.cpp)
-add_executable(cheat_node src/cheat_node)
+add_executable(cheat_odometry_node src/cheat_odometry_node.cpp)
 
 ## Rename C++ executable without prefix
 ## The above recommended prefix causes long target names, the following renames the
@@ -157,7 +157,7 @@ target_link_libraries(cascaded_pid_control
   ${catkin_LIBRARIES}
 )
 
-target_link_libraries(cheat_node
+target_link_libraries(cheat_odometry_node
   ${catkin_LIBRARIES}
 )
 

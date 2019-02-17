@@ -2,13 +2,13 @@
 
   <!-- cascaded pid control node -->
   <node pkg="cascaded_pid_control" type="cascaded_pid_control" name="CascadedPidControl" output="screen">
-    <remap from="~odometry" to="/CheatNode/odometry" />
+    <remap from="~odometry" to="/CheatOdometryNode/odometry" />
     <remap from="~rateThrust" to="/uav/input/rateThrust" />
 
     <param name="~publish_debug_topic" value="True" />
   </node>
 
-  <!-- cheat node -->
-  <node pkg="cascaded_pid_control" type="cheat_node" name="CheatNode" output="screen" />
+  <!-- cheat odometry node -->
+  <node pkg="cascaded_pid_control" type="cheat_odometry_node" name="CheatOdometryNode" output="screen" />
 
 </launch>

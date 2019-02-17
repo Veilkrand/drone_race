@@ -124,6 +124,8 @@ namespace cascaded_pid_control {
       Eigen::Vector3d pqr_rate_cmd = AttitudeControl(current, accel_cmd, thrust, dt);
       pqr_rate_cmd[2] = YawControl(current, set_point_.getYaw(), dt);
 
+      // ROS_INFO_STREAM(thrust<<" "<<accel_cmd<<" "<<pqr_rate_cmd);
+
       // control command is published as mav_msgs/RateThrust
       mav_msgs::RateThrust rate_thrust;
       rate_thrust.header.stamp = ros::Time::now();
