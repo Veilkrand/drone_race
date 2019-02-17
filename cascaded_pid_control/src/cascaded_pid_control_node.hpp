@@ -27,14 +27,6 @@ namespace cascaded_pid_control {
 
     virtual void Destroy();
 
-    private:
-    void DynamicReconfigureCallback(CascadedPidConfig &config, uint32_t level);
-
-    void OdometryCallback(const nav_msgs::OdometryConstPtr &ptr);
-    void TrajectoryCallback(const trajectory_msgs::MultiDOFJointTrajectoryConstPtr& ptr);
-
-    void TimerCallback(const ros::TimerEvent& e);
-
     /**
      * @param current current odometry in NWU
      * @param cmd commanded point in NWU. only the z component is used.
@@ -86,8 +78,20 @@ namespace cascaded_pid_control {
       double dt);
 
     private:
+    void DynamicReconfigureCallback(CascadedPidConfig &config, uint32_t level);
+
+    void OdometryCallback(const nav_msgs::OdometryConstPtr &ptr);
+    void TrajectoryCallback(const trajectory_msgs::MultiDOFJointTrajectoryConstPtr& ptr);
+
+    void TimerCallback(const ros::TimerEvent& e);
+
+    void PublishDebugTopic(const mav_msgs::EigenOdometry& odometry);
+
+    private:
     // parameters
     double mass_;
+    double min_thrust_;
+    double max_thrust_;
     double kp_x_;
     double kd_x_;
     double max_abs_accel_x_;
@@ -114,10 +118,19 @@ namespace cascaded_pid_control {
     std::deque<double> command_wait_time_;
 
     // current trajectory point
-    mav_msgs::EigenTrajectoryPoint curr_point_;
+    mav_msgs::EigenTrajectoryPoint set_point_;
     bool controller_active_;
 
-    Eigen::Vector3d default_ff_;
+    bool publish_debug_topic_;
+    // debug topic
+    ros::Publisher position_setpoint_pub_;
+    ros::Publisher velocity_setpoint_pub_;
+    ros::Publisher attitude_setpoint_pub_;
+    ros::Publisher position_error_pub_;
+    ros::Publisher velocity_error_pub_;
+    ros::Publisher attitude_error_pub_;
+
+    Eigen::Vector3d accel_ff_;
   };
 
 }

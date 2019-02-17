@@ -1,6 +1,7 @@
 #include <cmath>
 
 #include <ros/ros.h>
+#include <tf2_eigen/tf2_eigen.h>
 
 #include <mav_msgs/conversions.h>
 #include <mav_msgs/RateThrust.h>
@@ -11,31 +12,6 @@
 #include "cascaded_pid_control_node.hpp"
 
 namespace cascaded_pid_control {
-
-  inline Eigen::Quaterniond EigenQuat(const geometry_msgs::Quaternion &msg) {
-    return Eigen::Quaterniond(msg.w, msg.x, msg.y, msg.z);
-  }
-
-  inline Eigen::Matrix3d EigenRotMat(const geometry_msgs::Quaternion &msg) {
-    return Eigen::Quaterniond(msg.w, msg.x, msg.y, msg.z).toRotationMatrix();
-  }
-
-  inline Eigen::Vector3d EigenVec3(const geometry_msgs::Vector3& msg) {
-    return Eigen::Vector3d(msg.x, msg.y, msg.z);
-  }
-  
-  inline Eigen::Vector3d EigenVec3(const geometry_msgs::Point& msg) {
-    return Eigen::Vector3d(msg.x, msg.y, msg.z);
-  }
-
-  inline Eigen::Vector3d EulerRpy(const geometry_msgs::Quaternion& msg) {
-    // see: https://en.wikipedia.org/wiki/Conversion_between_quaternions_and_Euler_angles#Quaternion%20to%20Euler%20Angles%20Conversion
-    return Eigen::Vector3d(std::atan2(2.0 * (msg.w * msg.x + msg.y * msg.z),
-                                      1.0 - 2.0 * (msg.x * msg.x + msg.y * msg.y)),
-                           std::asin(2.0 * (msg.w * msg.y - msg.z * msg.x)),
-                           std::atan2(2.0 * (msg.w * msg.z + msg.x * msg.y),
-                                      1.0 - 2.0 * (msg.y * msg.y + msg.z * msg.z)));
-  }
 
   inline geometry_msgs::Vector3 MsgVec3(const Eigen::Vector3d& vec) {
     geometry_msgs::Vector3 result;
@@ -71,8 +47,7 @@ namespace cascaded_pid_control {
       result = z_dot_dot * mass_ / rot_mat(2, 2);
 
       // clamp value
-      result = std::max(0.0, result);
-
+      result = Constrain(result, min_thrust_, max_thrust_);
       return result;
   }
 
@@ -144,10 +119,10 @@ namespace cascaded_pid_control {
       double current_time = ptr->header.stamp.toSec();
       double dt = current_time - last_odometry_time_;
 
-      double thrust = AltitudeControl(current, curr_point_, default_ff_, dt);
-      Eigen::Vector3d accel_cmd = LateralPositionControl(current, curr_point_, default_ff_, dt);
+      double thrust = AltitudeControl(current, set_point_, accel_ff_, dt);
+      Eigen::Vector3d accel_cmd = LateralPositionControl(current, set_point_, accel_ff_, dt);
       Eigen::Vector3d pqr_rate_cmd = AttitudeControl(current, accel_cmd, thrust, dt);
-      pqr_rate_cmd[2] = YawControl(current, curr_point_.getYaw(), dt);
+      pqr_rate_cmd[2] = YawControl(current, set_point_.getYaw(), dt);
 
       // control command is published as mav_msgs/RateThrust
       mav_msgs::RateThrust rate_thrust;
@@ -155,6 +130,10 @@ namespace cascaded_pid_control {
       rate_thrust.header.frame_id = "uav/imu";
       rate_thrust.thrust.z = thrust;
       mav_msgs::vectorEigenToMsg(pqr_rate_cmd, &rate_thrust.angular_rates);
+
+      if (publish_debug_topic_) {
+        PublishDebugTopic(current);
+      }
 
       rate_thrust_pub_.publish(rate_thrust);
       last_odometry_time_ = current_time;
@@ -168,11 +147,21 @@ namespace cascaded_pid_control {
 
     controller_active_ = false;
     last_odometry_time_ = 0;
-    default_ff_ << 0, 0, GRAVITY_CONST;
+    accel_ff_ << 0, 0, GRAVITY_CONST;
+    publish_debug_topic_ = private_nh_.param("publish_debug_topic", false);
 
     rate_thrust_pub_ = private_nh_.advertise<mav_msgs::RateThrust>("rateThrust", 1);
     odometry_sub_ = private_nh_.subscribe<nav_msgs::Odometry>("odometry", 1, &CascadedPidControl::OdometryCallback, this);
     trajectory_sub_ = private_nh_.subscribe<trajectory_msgs::MultiDOFJointTrajectory>("trajectory", 1, &CascadedPidControl::TrajectoryCallback, this);
+
+    if (publish_debug_topic_) {
+      position_setpoint_pub_ = private_nh_.advertise<geometry_msgs::Vector3>("positionSetpoint", 8);
+      velocity_setpoint_pub_ = private_nh_.advertise<geometry_msgs::Vector3>("velocitySetpoint", 8);
+      attitude_setpoint_pub_ = private_nh_.advertise<geometry_msgs::Vector3>("attitudeSetpoint", 8);
+      position_error_pub_ = private_nh_.advertise<geometry_msgs::Vector3>("positionError", 8);
+      velocity_error_pub_ = private_nh_.advertise<geometry_msgs::Vector3>("velocityError", 8);
+      attitude_error_pub_ = private_nh_.advertise<geometry_msgs::Vector3>("attitudeError", 8);
+    }
 
     timer_ = nh_.createTimer(ros::Duration(0), &CascadedPidControl::TimerCallback, this, true, false);
 
@@ -186,6 +175,17 @@ namespace cascaded_pid_control {
   void CascadedPidControl::DynamicReconfigureCallback(CascadedPidConfig &config, uint32_t level) {
     ROS_INFO("Dynamic reconfigure requested.");
     mass_ = config.mass;
+    // motors should generate at least (mass * g) N force, this is the minimum
+    // value of max_thrust, and maximu value of min_thrust
+    if (config.max_thrust < mass_ * GRAVITY_CONST) {
+      config.max_thrust = mass_ * GRAVITY_CONST;
+    }
+    if (config.min_thrust > mass_ * GRAVITY_CONST) {
+      config.min_thrust = mass_ * GRAVITY_CONST;
+    }
+    min_thrust_ = config.min_thrust;
+    max_thrust_ = config.max_thrust;
+
     kp_x_ = config.kp_x;
     kd_x_ = config.kd_x;
     max_abs_accel_x_ = config.max_abs_accel_x;
@@ -207,6 +207,41 @@ namespace cascaded_pid_control {
     if (config.rp_same_params) {
       config.kp_pitch = kp_pitch_ = kp_roll_;
     }
+  }
+
+  void CascadedPidControl::PublishDebugTopic(const mav_msgs::EigenOdometry& odometry) {
+    // debug topic includes:
+    //  1. set point position
+    //  2. set point velocit
+    //  3. set point attitude (x component: roll, y component: pitch, z component: yaw)
+    geometry_msgs::Vector3 pos_setpoint;
+    tf2::toMsg(set_point_.position_W, pos_setpoint);
+    geometry_msgs::Vector3 vel_setpoint;
+    tf2::toMsg(set_point_.velocity_W, vel_setpoint);
+    geometry_msgs::Vector3 att_setpoint;
+    Eigen::Vector3d set_att;
+    mav_msgs::getEulerAnglesFromQuaternion(set_point_.orientation_W_B, &set_att);
+    tf2::toMsg(set_att, att_setpoint);
+
+    position_setpoint_pub_.publish(pos_setpoint);
+    velocity_setpoint_pub_.publish(vel_setpoint);
+    attitude_setpoint_pub_.publish(att_setpoint);
+
+    //  4. error of position
+    //  5. error of velocity
+    //  6. error of attitude (x component: roll, y component: pitch, z component: yaw)
+    geometry_msgs::Vector3 pos_error;
+    tf2::toMsg(set_point_.position_W - odometry.position_W, pos_error);
+    geometry_msgs::Vector3 vel_error;
+    tf2::toMsg(set_point_.velocity_W - odometry.getVelocityWorld(), vel_error);
+    geometry_msgs::Vector3 att_error;
+    Eigen::Vector3d ego_att;
+    mav_msgs::getEulerAnglesFromQuaternion(odometry.orientation_W_B, &ego_att);
+    tf2::toMsg(set_att - ego_att, att_error);
+
+    position_error_pub_.publish(pos_error);
+    velocity_error_pub_.publish(vel_error);
+    attitude_error_pub_.publish(att_error);
   }
 
   void CascadedPidControl::TrajectoryCallback(const trajectory_msgs::MultiDOFJointTrajectoryConstPtr& ptr) {
@@ -237,7 +272,7 @@ namespace cascaded_pid_control {
       last_time = traj_time;
     }
 
-    curr_point_ = traj_points_.front();
+    set_point_ = traj_points_.front();
     traj_points_.pop_front();
 
     if (!traj_points_.empty()) {
@@ -256,7 +291,7 @@ namespace cascaded_pid_control {
       return;
     }
 
-    curr_point_ = traj_points_.front();
+    set_point_ = traj_points_.front();
     traj_points_.pop_front();
     if (!traj_points_.empty()) {
       double wait_time = command_wait_time_.front();

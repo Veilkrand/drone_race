@@ -4,6 +4,8 @@
   <node pkg="cascaded_pid_control" type="cascaded_pid_control" name="CascadedPidControl" output="screen">
     <remap from="~odometry" to="/CheatNode/odometry" />
     <remap from="~rateThrust" to="/uav/input/rateThrust" />
+
+    <param name="~publish_debug_topic" value="True" />
   </node>
 
   <!-- cheat node -->
