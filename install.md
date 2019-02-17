@@ -64,6 +64,34 @@ touch src/rotors_simulator/rotors_hil_interface/CATKIN_IGNORE
 touch src/asctec_mav_framework/asctec_hl_interface/CATKIN_IGNORE
 ```
 
+#### Flight Goggles
+
+We're still working on the transition from RotorS to Flight Goggles. These instructions get the
+Flight Goggles simulator running, assuming the previous dependencies have already been installed.
+
+```sh
+cd ~/catkin_ws/src
+git clone git@github.com:ethz-asl/gflags_catkin.git
+wstool merge https://raw.githubusercontent.com/mit-fast/FlightGoggles/master/flightgoggles.rosinstall
+wstool update
+cd ~/catkin_ws
+rosdep install --from-paths src --ignore-src --rosdistro kinetic --skip-keys="rotors_hil_interface asctec_hl_interface asctec_hl_firmware" -y
+sudo apt install -y libzmqpp-dev libeigen3-dev
+sudo apt install -y libvulkan1 mesa-vulkan-drivers vulkan-utils
+catkin build
+source devel/setup.bash
+sudo apt-get install nvidia-384 nvidia-modprobe
+```
+
+Run the simulator with either of these options:
+
+* Manual control with joystick: `$ roslaunch flightgoggles teleopExample.launch`
+* Automated control: `$ roslaunch flightgoggles core.launch`
+
+For manual control, you need to find the tiny "keyboard" window and make sure it is the active window.
+Hold down the spacebar at all times and use the following keys to control: ASDW for thrust and yaw
+rate, JKLI for roll and pitch rate.
+
 #### Cloning this project into the workspace
 
 ```sh
