@@ -130,7 +130,7 @@ namespace cascaded_pid_control {
     ros::Publisher velocity_error_pub_;
     ros::Publisher attitude_error_pub_;
 
-    Eigen::Vector3d accel_ff_;
+    Eigen::Vector3d default_ff_;
   };
 
 }
