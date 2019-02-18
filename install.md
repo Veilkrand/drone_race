@@ -227,7 +227,7 @@ There're 3 launch files in `cascaded_pid_control` package:
 
     `set_point.py` command accepts 3 or 4 parameters. The first 3 parameters are the targeted location, specified in NWU manner in global `/world` frame. The last parameter specify the targeted yaw angle in degree, and if omitted, it will be set to 0, i.e., facing to the north.
 
-    It is important to make the drone take off first before hanging around. If you try to set point before the drone is hovering, the drone is very likely to flip over. That's because there isn't no thrust when the drone is sitting still. It won't be able to change attitude. At the time of writing, there isn't effective way to detect whether the drone is taken off or sitting on the ground. So you need to do it manually.
+    It is important to make the drone take off first before hanging around. If you try to set point before the drone is hovering, the drone is very likely to flip over. That's because there is no thrust when the drone is sitting still. It won't be able to change attitude. At the time of writing, there isn't effective way to detect whether the drone is taken off or sitting on the ground. So you need to do it manually.
 
 3. If you want to start the planner part too, run:
 
