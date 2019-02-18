@@ -204,7 +204,7 @@ There're 3 launch files in `cascaded_pid_control` package:
 
     If you're annoying about the rviz poping up everytime, you can run this instead:
     ```shell
-    roslaunch flightgoggles core.launch use_external_renderer:=1 ignore_collisions:=1
+    roslaunch cascaded_pid_control flightgoggles_core.launch use_external_renderer:=1 ignore_collisions:=1
     ```
 
 2. Start up the cascaded pid control package in a new terminal:
