@@ -85,6 +85,12 @@ namespace cascaded_pid_control {
     double bx_cmd = accel_cmd[0] / c;
     double by_cmd = accel_cmd[1] / c;
 
+    // clamp bx_cmd and by_cmd be with [-sqrt(2)/2,  sqrt(2)/2]
+    // this will result in forcing angle between the thrust vector and x/y axis of world frame 
+    // be in [45deg, 135deg] (this is not the same with constraining roll and pitch angle)
+    bx_cmd = Constrain(bx_cmd, -0.707, 0.707);
+    by_cmd = Constrain(by_cmd, -0.707, 0.707);
+    
     double bx_dot = kp_pitch_ * (bx_cmd - bx);
     double by_dot = kp_roll_ * (by_cmd - by);
 
