@@ -88,8 +88,8 @@ namespace cascaded_pid_control {
     // clamp bx_cmd and by_cmd be with [-sqrt(2)/2,  sqrt(2)/2]
     // this will result in forcing angle between the thrust vector and x/y axis of world frame 
     // be in [45deg, 135deg] (this is not the same with constraining roll and pitch angle)
-    bx_cmd = Constrain(bx_cmd, -0.707, 0.707);
-    by_cmd = Constrain(by_cmd, -0.707, 0.707);
+    bx_cmd = Constrain(bx_cmd, -0.5, 0.5);
+    by_cmd = Constrain(by_cmd, -0.5, 0.5);
     
     double bx_dot = kp_pitch_ * (bx_cmd - bx);
     double by_dot = kp_roll_ * (by_cmd - by);
@@ -125,8 +125,10 @@ namespace cascaded_pid_control {
       double current_time = ptr->header.stamp.toSec();
       double dt = current_time - last_odometry_time_;
 
-      double thrust = AltitudeControl(current, set_point_, accel_ff_, dt);
-      Eigen::Vector3d accel_cmd = LateralPositionControl(current, set_point_, accel_ff_, dt);
+      Eigen::Vector3d accel_ff = set_point_.acceleration_W + default_ff_;
+
+      double thrust = AltitudeControl(current, set_point_, accel_ff, dt);
+      Eigen::Vector3d accel_cmd = LateralPositionControl(current, set_point_, accel_ff, dt);
       Eigen::Vector3d pqr_rate_cmd = AttitudeControl(current, accel_cmd, thrust, dt);
       pqr_rate_cmd[2] = YawControl(current, set_point_.getYaw(), dt);
 
@@ -155,7 +157,7 @@ namespace cascaded_pid_control {
 
     controller_active_ = false;
     last_odometry_time_ = 0;
-    accel_ff_ << 0, 0, GRAVITY_CONST;
+    default_ff_ << 0, 0, GRAVITY_CONST;
     publish_debug_topic_ = private_nh_.param("publish_debug_topic", false);
 
     rate_thrust_pub_ = private_nh_.advertise<mav_msgs::RateThrust>("rateThrust", 1);
