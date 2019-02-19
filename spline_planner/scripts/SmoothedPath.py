@@ -35,7 +35,7 @@ class SmoothedPath(object):
     self.tck = splprep([[p.x for p in points],
                         [p.y for p in points],
                         [p.z for p in points]],
-                        u=distances,k=order)[0]
+                        u=distances,k=order,s=0)[0]
     self.chord_length_total = distances[-1]
 
   def visit_at_interval(self, ds, callback_fn, lookahead_max=-1):
