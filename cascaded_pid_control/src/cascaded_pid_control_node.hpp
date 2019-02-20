@@ -87,6 +87,8 @@ namespace cascaded_pid_control {
 
     void PublishDebugTopic(const mav_msgs::EigenOdometry& odometry);
 
+    void SetNextPoint(const mav_msgs::EigenTrajectoryPoint& point);
+
     private:
     // parameters
     double mass_;
@@ -129,6 +131,7 @@ namespace cascaded_pid_control {
     ros::Publisher position_error_pub_;
     ros::Publisher velocity_error_pub_;
     ros::Publisher attitude_error_pub_;
+    ros::Publisher target_pose_pub_;
 
     Eigen::Vector3d default_ff_;
   };

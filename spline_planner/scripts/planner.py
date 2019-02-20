@@ -69,7 +69,9 @@ trajectory_length: {trajectory_length}""".format(**config))
         rate = rospy.Rate(1)
         started = False
         while not rospy.is_shutdown():
-            if len(self.gates) > 0 and self.odometry is not None:
+            if started:
+                pass
+            elif len(self.gates) > 0 and self.odometry is not None:
                 trajectory = self.create_path(self.odometry, self.gates, self.last_visited_gate)
                 if trajectory is None:
                      print("Failed to create trajectory")
@@ -97,7 +99,6 @@ trajectory_length: {trajectory_length}""".format(**config))
                 gates = gates[visited_index+1:] + gates[:visited_index+1]
 
         waypoints = [start_position]
-
         #start_speed = geo.magnitude_vector(start_velocity)
         #if start_speed > 0.3:
         #    waypoints.append(geo.point_plus_vector(start_position, geo.normalize(start_velocity, 0.1)))
@@ -105,6 +106,8 @@ trajectory_length: {trajectory_length}""".format(**config))
         for gate in gates:
             for offset in [-0.5, 0.5]:
                 waypoints.append(geo.point_plus_vector(gate.position, geo.quaternion_to_vector(gate.orientation, offset)))
+        #for p in waypoints:
+        #    print('({}, {}, {}),'.format(p.x, p.y, p.z))
 
         # waypoint_spline = geo.points_to_spline(waypoints)
         path = SmoothedPath()
@@ -112,7 +115,6 @@ trajectory_length: {trajectory_length}""".format(**config))
         
         # TODO: determine appropriate speeds based on start speed, max speed, and max acceleration (centripetal acceleration limits speed on tight curve)
         # For now just use constant speed of self.max_speed.
-        ds = self.ds
         trajectory_points = []
         def visit_cb(pt, deriv1, deriv2, s):
             # curvature is calcuated as norm(deriv1 x deriv2) / norm(deriv1)**3
@@ -145,9 +147,15 @@ trajectory_length: {trajectory_length}""".format(**config))
                 unit_d2 = np.array([0.0, 0.0, 0.0])
                 
             unit_binormal = np.cross(unit_d1, unit_d2)
+
+            ds = 0
+            if len(trajectory_points) > 0:
+                last_point = trajectory_points[-1]
+                ds = s - last_point['s']
             
             trajectory_points.append({
                 's': s,
+                'ds': ds,
                 'point': Vector3(*(pt.tolist())),
                 'speed': self.max_speed,
                 'speed_direction': Vector3(*(unit_d1.tolist())),
@@ -155,31 +163,32 @@ trajectory_length: {trajectory_length}""".format(**config))
                 'unit_binormal': Vector3(*(unit_binormal.tolist())),
                 'curvature': c
             })
-        path.visit_at_interval(ds, visit_cb, self.trajectory_length)
+        path.visit_at_interval(self.ds, visit_cb, self.trajectory_length)
 #        trajectory_points = [{'s': i * ds, 'speed': self.max_speed, 'curvature': geo.spline_distance_to_curvature(waypoint_spline, i*ds)} for i in range(30)]
         vmin = self.min_speed
         vmax = self.max_speed
         amax = self.max_acceleration
 
-        def safe_speed(curvature, speed_neighbor):
+        def safe_speed(curvature, speed_neighbor, ds):
             centripetal = curvature * speed_neighbor**2
             if centripetal >= amax:
                 return max(vmin, min(vmax, math.sqrt(abs(amax / curvature))))
             remaining_acceleration = math.sqrt(amax**2 - centripetal**2)
             # see /Planning Motion Trajectories for Mobile Robots Using Splines/
             # (refered as Sprunk[2008] later) for more details (eq 3.21)
+            print(ds, remaining_acceleration)
             v_this = math.sqrt(speed_neighbor ** 2 + 2 * ds * remaining_acceleration)
             return max(vmin, min(vmax, v_this))
 
         trajectory_points[0]['speed'] = min(vmax, max(vmin, geo.magnitude_vector(start_velocity)))
         num_traj = len(trajectory_points)
         for i in range(num_traj - 1): # iterate forwards, skipping first point which is fixed to current speed
-            trajectory_points[i+1]['speed'] = safe_speed(trajectory_points[i+1]['curvature'], trajectory_points[i]['speed'])
+            trajectory_points[i+1]['speed'] = safe_speed(trajectory_points[i+1]['curvature'], trajectory_points[i]['speed'], trajectory_points[i+1]['ds'])
         for i in range(num_traj - 2):
             j = num_traj - i - 2 # iterate backwards, skipping both end points
             curvature = trajectory_points[j]['curvature']
             min_neighbor_speed = min(trajectory_points[j-1]['speed'],trajectory_points[j+1]['speed'])
-            trajectory_points[j]['speed'] = safe_speed(curvature, min_neighbor_speed)
+            trajectory_points[j]['speed'] = safe_speed(curvature, min_neighbor_speed, trajectory_points[i+1]['ds'])
 
         # Set velocity based on speed and direction
         for point in trajectory_points:
@@ -196,6 +205,7 @@ trajectory_length: {trajectory_length}""".format(**config))
         # Set time based on speed and distance
         trajectory_points[0]['time'] = 0.0
         for i in range(num_traj - 1):
+            ds = trajectory_points[i+1]['ds']
             prev_time = trajectory_points[i]['time']
             # see Sprunk[2018] eq 3.20
             ave_speed = 0.5 * (trajectory_points[i]['speed'] + trajectory_points[i+1]['speed'])
@@ -222,6 +232,10 @@ trajectory_length: {trajectory_length}""".format(**config))
         trajectory_points[-1]['acceleration'] = trajectory_points[-2]['acceleration']
         trajectory_points[-1]['acceleration_w'] = trajectory_points[-2]['acceleration_w']
 
+        for p in trajectory_points:
+            print(p)
+        print("-----")
+
         # TODO: determine thrust direction at each point, based on linear acceleration, centripetal acceleration, gravity, and drag.
         # For now just set accelerations to 0.
 
@@ -232,8 +246,7 @@ trajectory_length: {trajectory_length}""".format(**config))
         trajectory.header.frame_id=''
         trajectory.header.stamp = start_time
         trajectory.joint_names = ['base']
-        # remove the first trajectory point (current poisition)
-        for point in trajectory_points[1:]:
+        for point in trajectory_points:
             transform = Transform()
             transform.translation = point['point']
             transform.rotation = Quaternion(*(geo.vector_to_quat(point['velocity']).tolist()))

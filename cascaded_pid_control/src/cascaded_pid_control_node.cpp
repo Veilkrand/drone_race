@@ -171,6 +171,7 @@ namespace cascaded_pid_control {
       position_error_pub_ = private_nh_.advertise<geometry_msgs::Vector3>("positionError", 8);
       velocity_error_pub_ = private_nh_.advertise<geometry_msgs::Vector3>("velocityError", 8);
       attitude_error_pub_ = private_nh_.advertise<geometry_msgs::Vector3>("attitudeError", 8);
+      target_pose_pub_ = private_nh_.advertise<geometry_msgs::PoseStamped>("targetPose", 1);
     }
 
     timer_ = nh_.createTimer(ros::Duration(0), &CascadedPidControl::TimerCallback, this, true, false);
@@ -282,7 +283,7 @@ namespace cascaded_pid_control {
       last_time = traj_time;
     }
 
-    set_point_ = traj_points_.front();
+    SetNextPoint(traj_points_.front());
     traj_points_.pop_front();
 
     if (!traj_points_.empty()) {
@@ -301,7 +302,7 @@ namespace cascaded_pid_control {
       return;
     }
 
-    set_point_ = traj_points_.front();
+    SetNextPoint(traj_points_.front());
     traj_points_.pop_front();
     if (!traj_points_.empty()) {
       double wait_time = command_wait_time_.front();
@@ -309,6 +310,18 @@ namespace cascaded_pid_control {
       timer_.stop();
       timer_.setPeriod(ros::Duration(wait_time));
       timer_.start();
+    }
+  }
+
+  void CascadedPidControl::SetNextPoint(const mav_msgs::EigenTrajectoryPoint& point) {
+    set_point_ = point;
+    if (publish_debug_topic_) {
+      geometry_msgs::PoseStamped msg;
+      msg.header.frame_id = "world";
+      msg.header.stamp = ros::Time::now();
+      mav_msgs::pointEigenToMsg(set_point_.position_W, &msg.pose.position);
+      mav_msgs::quaternionEigenToMsg(set_point_.orientation_W_B, &msg.pose.orientation);
+      target_pose_pub_.publish(msg);
     }
   }
 

@@ -5,7 +5,7 @@ querying methods for the fit path
 
 import math
 import operator
-from scipy.interpolate import splprep, spalde
+from spline_planner.eigen_spline import CubicSpline3DWrapper
 import numpy as np
 
 class SmoothedPath(object):
@@ -25,18 +25,8 @@ class SmoothedPath(object):
     # splprep/spalde from FITPACK library offers derivatives querying methods which is useful for later processing
     #
     # see: https://docs.scipy.org/doc/scipy/reference/tutorial/interpolate.html#spline-interpolation
-    distance_so_far = 0.0
-    last_point = points[0]
-    distances = []
-    for point in points:
-        distances.append(distance_so_far + SmoothedPath._distance(last_point, point))
-        distance_so_far = distances[-1]
-    order = 3
-    self.tck = splprep([[p.x for p in points],
-                        [p.y for p in points],
-                        [p.z for p in points]],
-                        u=distances,k=order)[0]
-    self.chord_length_total = distances[-1]
+    pts = [[p.x, p.y, p.z] for p in points]
+    self.spline = CubicSpline3DWrapper(pts)
 
   def visit_at_interval(self, ds, callback_fn, lookahead_max=-1):
     """
@@ -50,44 +40,7 @@ class SmoothedPath(object):
 
     At which point it should visit and how long the distance is are approximated vbia numerical integration method.
     """
-    # dt defines the interval of sampled points along the knot vector (chord length). it should not be too large since
-    # it is also used in numerical integration
-    dt = 0.1
-    last_s = 0
-    current_s = 0
-    current_t = 0
-    last_deriv1_norm = 0
-    while True:
-      # query point and derivatives from the fit spline.
-      # zero-order derivative is the point on the spline
-      alde = np.array(spalde(current_t, self.tck))
-      pt, deriv1, deriv2 = alde[:, 0], alde[:, 1], alde[:, 2]
-      
-      # by definition (see https://en.wikipedia.org/wiki/Arc_length#Definition_for_a_smooth_curve),
-      # arc length at some chord length t is: s(t) = \int_0^t ||s'(t)|| dt, 
-      # where s'(t) is the 1st order derivative at t
-      #
-      # by using the trapeziod method to do numeric integation, 
-      # if we have s(t_p) be some value and we already know ||s'(t_p)||,
-      # then for t_c = t_p + dt:
-      # s(t_c) = s(t_p) + 0.5 * (||s'(t_p)|| + ||s'(t_c)||) * dt
-      deriv1_norm = np.linalg.norm(deriv1)
-      if current_t == 0:
-        last_deriv1_norm = deriv1_norm
-      else:
-        current_s += 0.5 * (deriv1_norm + last_deriv1_norm) * dt
-        last_deriv1_norm = deriv1_norm
-
-      current_t += dt
-
-      if current_s - last_s >= ds or current_s == 0 or current_t > self.chord_length_total:
-        last_s = current_s
-        if callback_fn is not None:
-          callback_fn(pt, deriv1, deriv2, current_s)
-
-      if current_t > self.chord_length_total:
-        break
-
-      if lookahead_max > 0 and current_s > lookahead_max:
-        break
-
+    result = self.spline.sampleAndCollect(ds, lookahead_max, 0.01)
+    for s, derivs in result:
+      arr = np.array(derivs)
+      callback_fn(arr[0, :], arr[1, :], arr[2, :], s)
