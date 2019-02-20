@@ -214,8 +214,23 @@ Visualization Manager:
       Marker Topic: /spline_planner/raw_waypoints_viz
       Name: Raw Waypoints
       Namespaces:
-        "": true
+        {}
       Queue Size: 100
+      Value: true
+    - Alpha: 1
+      Axes Length: 1
+      Axes Radius: 0.100000001
+      Class: rviz/Pose
+      Color: 255; 25; 0
+      Enabled: true
+      Head Length: 0.300000012
+      Head Radius: 0.100000001
+      Name: Pose
+      Shaft Length: 1
+      Shaft Radius: 0.0500000007
+      Shape: Arrow
+      Topic: /CascadedPidControl/targetPose
+      Unreliable: false
       Value: true
   Enabled: true
   Global Options:
@@ -249,18 +264,18 @@ Visualization Manager:
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: 2.5241518
-        Y: 10.5798931
-        Z: 2.2856002e-05
+        X: 3.74239564
+        Y: -15.8528833
+        Z: 2.03991494e-05
       Focal Shape Fixed Size: false
       Focal Shape Size: 0.0500000007
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.00999999978
-      Pitch: 0.699797153
+      Pitch: 0.314796984
       Target Frame: <Fixed Frame>
       Value: XYOrbit (rviz)
-      Yaw: 5.72356892
+      Yaw: 5.03356934
     Saved: ~
 Window Geometry:
   Displays:
