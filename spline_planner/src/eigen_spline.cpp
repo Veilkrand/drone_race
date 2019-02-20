@@ -2,11 +2,9 @@
 #include <boost/assert.hpp>
 #include <vector>
 #include <Eigen/Dense>
-#include <iostream>
 
 #include "eigen_spline.hpp"
 
-using namespace std;
 using namespace spline_planner;
 
 namespace py = boost::python;
@@ -89,10 +87,6 @@ struct CubicSpline3DWrapper {
     for (size_t i = 0; i < num_derivs; ++i) {
       vec_index(i) = py::extract<int>(index[i]);
     }
-
-    std::cout<<std::endl<<mat<<std::endl;
-    std::cout<<std::endl<<mat_derivs<<std::endl;
-    std::cout<<std::endl<<vec_index<<std::endl;
     
     spline_ = new CubicSpline3D(mat, mat_derivs, vec_index);
   }

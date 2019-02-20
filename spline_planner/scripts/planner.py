@@ -176,7 +176,6 @@ trajectory_length: {trajectory_length}""".format(**config))
             remaining_acceleration = math.sqrt(amax**2 - centripetal**2)
             # see /Planning Motion Trajectories for Mobile Robots Using Splines/
             # (refered as Sprunk[2008] later) for more details (eq 3.21)
-            print(ds, remaining_acceleration)
             v_this = math.sqrt(speed_neighbor ** 2 + 2 * ds * remaining_acceleration)
             return max(vmin, min(vmax, v_this))
 
@@ -231,10 +230,6 @@ trajectory_length: {trajectory_length}""".format(**config))
             trajectory_points[i]['acceleration_w'] = geo.scalar_multiply(1.0/dt, dw)
         trajectory_points[-1]['acceleration'] = trajectory_points[-2]['acceleration']
         trajectory_points[-1]['acceleration_w'] = trajectory_points[-2]['acceleration_w']
-
-        for p in trajectory_points:
-            print(p)
-        print("-----")
 
         # TODO: determine thrust direction at each point, based on linear acceleration, centripetal acceleration, gravity, and drag.
         # For now just set accelerations to 0.

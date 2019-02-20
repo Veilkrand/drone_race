@@ -40,7 +40,7 @@ class SmoothedPath(object):
 
     At which point it should visit and how long the distance is are approximated vbia numerical integration method.
     """
-    result = self.spline.sampleAndCollect(ds, lookahead_max, 0.01)
+    result = self.spline.sampleAndCollect(ds, lookahead_max, 0.0005)
     for s, derivs in result:
       arr = np.array(derivs)
       callback_fn(arr[0, :], arr[1, :], arr[2, :], s)
