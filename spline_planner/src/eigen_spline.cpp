@@ -38,8 +38,9 @@ Eigen::MatrixXd RowMajorPython2DListToColumnMajorMatrix(py::list list) {
 
 struct SplineSamplingCallback {
 
-  void operator()(double s, const Eigen::MatrixXd& derivatives) {
+  void operator()(double t, double s, const Eigen::MatrixXd& derivatives) {
     py::list point;
+    point.append(t);
     point.append(s);
     point.append(ColumnMajorMatrixToRowMajorPython2DList(derivatives));
     result.append(point);

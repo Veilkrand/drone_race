@@ -48,6 +48,7 @@ trajectory_length: {trajectory_length}""".format(**config))
         self.max_acceleration = config.max_total_acceleration
         self.ds = config.ds
         self.trajectory_length = config.trajectory_length
+
         return config
 
     def gates_callback(self, msg):
@@ -69,7 +70,7 @@ trajectory_length: {trajectory_length}""".format(**config))
         rate = rospy.Rate(1)
         started = False
         while not rospy.is_shutdown():
-            if started:
+            if started and False:
                 pass
             elif len(self.gates) > 0 and self.odometry is not None:
                 trajectory = self.create_path(self.odometry, self.gates, self.last_visited_gate)
@@ -88,7 +89,8 @@ trajectory_length: {trajectory_length}""".format(**config))
 
     def create_path(self, odometry, gates, last_visited_gate): # types are Odometry, [Pose], Pose
         start_position = odometry.pose.pose.position
-        start_velocity = odometry.twist.twist.linear
+        start_velocity = geo.rotate_vector_wrt_quaternion(odometry.pose.pose.orientation, odometry.twist.twist.linear)
+        print("start v:", start_velocity)
         start_time = odometry.header.stamp
         if last_visited_gate is not None:
             visited_index = None
@@ -106,15 +108,27 @@ trajectory_length: {trajectory_length}""".format(**config))
         for gate in gates:
             for offset in [-0.5, 0.5]:
                 waypoints.append(geo.point_plus_vector(gate.position, geo.quaternion_to_vector(gate.orientation, offset)))
-        #for p in waypoints:
-        #    print('({}, {}, {}),'.format(p.x, p.y, p.z))
 
-        # waypoint_spline = geo.points_to_spline(waypoints)
-        path = SmoothedPath()
-        path.fit(waypoints)
+        # in case of re-planning, we'd want the curvature at the starting point of the resulting path is the 
+        # same as first waypoint we feed. so we will fix the derivative of the first point.
+        #
+        # so: || omega || = || v || * k
+        # k = || omega || / || v ||
+        v = np.array([start_velocity.x,
+                      start_velocity.y,
+                      start_velocity.z])
+        # on the other hands, k = norm(deriv1 x dervi2) / norm(deriv1) ** 3
+        #                       = || deriv1 || * || deriv2 || * sin(theta) / || deriv1 || ** 3
+        #                       = || deriv2 || * sin(theta) / || deriv1 || ** 2
+        #          || deriv1 || = sqrt(|| deriv2 || * sin(theta) / k)
         
-        # TODO: determine appropriate speeds based on start speed, max speed, and max acceleration (centripetal acceleration limits speed on tight curve)
-        # For now just use constant speed of self.max_speed.
+        path = SmoothedPath()
+        if np.linalg.norm(v) > 0.5 and False:
+            print(v)
+            path.fit(waypoints, np.array([v]).tolist(), [0])
+        else:
+            path.fit(waypoints)
+        
         trajectory_points = []
         def visit_cb(pt, deriv1, deriv2, s):
             # curvature is calcuated as norm(deriv1 x deriv2) / norm(deriv1)**3
@@ -131,8 +145,8 @@ trajectory_length: {trajectory_length}""".format(**config))
             # because of this, the magnitude of first order derivative is not the same with viable speed,
             # but nevertheless, the direction of the derivative of them are the same.
 
-            # also note that unit normal vector at point is just the second order derivative,
-            # and it is in the opposite direction of the radius vector
+            # also note that unit normal vector at point is just the normalized second order derivative,
+            # it is in the opposite direction of the radius vector
 
             # the cross product of unit tangent vector and unit normal vector
             # is also mentioned as unit binormal vector
@@ -197,7 +211,9 @@ trajectory_length: {trajectory_length}""".format(**config))
             # where r is the radius vector, v is linear velocity.
             # see: https://en.wikipedia.org/wiki/Angular_velocity#Particle_in_three_dimensions
             # note: with the anti-commutative law of cross product,
-            # unit binomal = v x (-r) / (||v|| * ||r||) = r x v / (||v|| * ||r||)
+            # unit binormal B = v x (-r) / (||v|| * ||r||) = r x v / (||v|| * ||r||)
+            # and curvature k = 1 / || r ||
+            # so, omega = || v || * k * B 
             omega = geo.scalar_multiply(geo.magnitude_vector(point['velocity']) * point['curvature'], point['unit_binormal'])
             point['omega'] = omega
 
@@ -231,17 +247,11 @@ trajectory_length: {trajectory_length}""".format(**config))
         trajectory_points[-1]['acceleration'] = trajectory_points[-2]['acceleration']
         trajectory_points[-1]['acceleration_w'] = trajectory_points[-2]['acceleration_w']
 
-        # TODO: determine thrust direction at each point, based on linear acceleration, centripetal acceleration, gravity, and drag.
-        # For now just set accelerations to 0.
-
-        # TODO: determine orientation required to achieve that thrust while keeping quad mostly facing in direction of motion
-        # For now just using constant orientation.
-
         trajectory = MultiDOFJointTrajectory()
         trajectory.header.frame_id=''
         trajectory.header.stamp = start_time
         trajectory.joint_names = ['base']
-        for point in trajectory_points:
+        for point in trajectory_points[10:]:
             transform = Transform()
             transform.translation = point['point']
             transform.rotation = Quaternion(*(geo.vector_to_quat(point['velocity']).tolist()))

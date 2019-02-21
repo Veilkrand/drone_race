@@ -72,6 +72,12 @@ def quaternion_to_vector(quaternion, magnitude=1.0):
     tf_euler = tf.transformations.euler_from_quaternion(tf_quat)
     return rpy_to_vector(tf_euler[0],tf_euler[1],tf_euler[2], magnitude)
 
+def rotate_vector_wrt_quaternion(q, v):
+    tf_quat = np.array([q.x, q.y, q.z, q.w])
+    tf_vec = np.array([v.x, v.y, v.z])
+    result = np.matmul(tf.transformations.quaternion_matrix(tf_quat)[:3, :3], tf_vec)
+    return Vector3(*(result.tolist()))
+
 def rpy_to_quat(roll, pitch, yaw):
     quaternion_array = tf.transformations.quaternion_from_euler(roll, pitch, yaw, 'rxyz')
     result = Quaternion()

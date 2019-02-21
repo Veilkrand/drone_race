@@ -16,7 +16,7 @@ namespace spline_planner {
   public:
     typedef Eigen::Spline3d SplineType;
 
-    typedef boost::function<void(double, const Eigen::MatrixXd&)> SampleCallbackType;
+    typedef boost::function<void(double, double, const Eigen::MatrixXd&)> SampleCallbackType;
 
     /*
      * points: input points for fitting spline
@@ -52,7 +52,7 @@ namespace spline_planner {
 
         if ((s - last_s) >= sample_ds || (i * dt) > 1.0 || s <= 1e-7) {
           last_s = s;
-          callback(s, derivs);
+          callback(t, s, derivs);
         }
       }
     }
