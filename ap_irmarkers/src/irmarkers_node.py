@@ -8,7 +8,7 @@
 from __future__ import print_function
 import rospy
 from visualization_msgs.msg import Marker, MarkerArray
-#import tf.transformations
+import tf.transformations
 from geometry_msgs.msg import Point, Pose, PoseArray
 from flightgoggles.msg import IRMarker, IRMarkerArray
 
@@ -21,7 +21,7 @@ class SubscriberPublisher(object):
         self.node_name = _node_name
 
         # Publisher topics
-        #_result_marker_topic = _node_name + '/gt_visualization'
+        _markers_topic = _node_name + '/rviz_markers'
         #_result_pose_topic = _node_name + '/gt_gates'
 
         # Params
@@ -29,7 +29,7 @@ class SubscriberPublisher(object):
         _input_topic_irmarkers = rospy.get_param("~topic_irmarkers", "/uav/camera/left/ir_beacons")
 
         # Publishers
-        #self.marker_viz_pub = rospy.Publisher(_result_marker_topic, MarkerArray, queue_size=100)
+        self.marker_viz_pub = rospy.Publisher(_markers_topic, MarkerArray, queue_size=100)
         #self.gate_pose_pub = rospy.Publisher(_result_pose_topic, PoseArray, queue_size=100)
 
         # Subscriber
@@ -44,6 +44,8 @@ class SubscriberPublisher(object):
 
 
     def _irmarker_callback(self, data):
+
+        viz_marker_array = MarkerArray()
 
         for m in data.markers:
 
@@ -65,6 +67,25 @@ class SubscriberPublisher(object):
 
             if result is not None:
                 print(m.landmarkID.data, result)
+                pose = Pose()
+                pose.position.x = result['position'][0]
+                pose.position.y = result['position'][1]
+                pose.position.z = result['position'][2]
+
+                # _q = tf.transformations.quaternion_from_euler(result['rpy'][0], result['rpy'][1], result['rpy'][2])
+                # pose.orientation.x = _q[0]
+                # pose.orientation.y = _q[1]
+                # pose.orientation.z = _q[2]
+                # pose.orientation.w = _q[3]
+
+
+                _id = int(m.landmarkID.data[4:]) # Only the numeral of Gate00
+                marker = self._create_gate_rviz_marker(pose, _id, 'world')
+
+                viz_marker_array.markers.append(marker)
+
+        # Publish results
+        self.marker_viz_pub.publish(viz_marker_array)
 
 
 
@@ -75,6 +96,34 @@ class SubscriberPublisher(object):
         for key, val in self.gates.items():
 
             print('    ', key, ':', len(val))
+
+    def _create_gate_rviz_marker(self, pose, gate_id, frame_id):
+
+        marker = Marker()
+        marker.header.stamp = rospy.Time.now()
+
+        marker.header.frame_id = frame_id
+        marker.ns = self.node_name + '/gate_marker'
+        marker.id = gate_id
+
+        marker.type = marker.CUBE
+        marker.action = marker.ADD
+
+        # TODO: dims to params
+        marker.scale.x = 0.025
+        marker.scale.y = 1
+        marker.scale.z = 1
+
+        marker.color.r = 1.0
+        marker.color.g = 0.0
+        marker.color.b = 0.0
+        marker.color.a = 0.15
+
+        marker.lifetime = rospy.Duration(0.5)  # forever
+
+        marker.pose = pose
+
+        return marker
 
 
 
