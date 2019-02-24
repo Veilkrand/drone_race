@@ -10,10 +10,6 @@ import numpy as np
 
 class SmoothedPath(object):
 
-  @staticmethod
-  def _distance(point1, point2):
-    return math.sqrt( (point2.x-point1.x)**2 + (point2.y-point1.y)**2 + (point2.z-point1.z)**2 )
-
   def fit(self, points, derivatives = None, indices = None):
     """
     Fit a path with the given points
@@ -25,11 +21,10 @@ class SmoothedPath(object):
     # splprep/spalde from FITPACK library offers derivatives querying methods which is useful for later processing
     #
     # see: https://docs.scipy.org/doc/scipy/reference/tutorial/interpolate.html#spline-interpolation
-    pts = [[p.x, p.y, p.z] for p in points]
     if derivatives is not None and indices is not None and len(derivatives) == len(indices):
-      self.spline = CubicSpline3DWrapper(pts, derivatives, indices)
+      self.spline = CubicSpline3DWrapper(points, derivatives, indices)
     else:
-      self.spline = CubicSpline3DWrapper(pts)
+      self.spline = CubicSpline3DWrapper(points)
 
   def visit_at_interval(self, ds, callback_fn, lookahead_max=-1):
     """
@@ -44,6 +39,6 @@ class SmoothedPath(object):
     At which point it should visit and how long the distance is are approximated vbia numerical integration method.
     """
     result = self.spline.sampleAndCollect(ds, lookahead_max, 0.0005)
-    for _, s, derivs in result:
+    for t, s, derivs in result:
       arr = np.array(derivs)
-      callback_fn(arr[0, :], arr[1, :], arr[2, :], s)
+      callback_fn(arr[0, :], arr[1, :], arr[2, :], s, t)

@@ -59,6 +59,7 @@ def trajectory_callback(traj):
     linear = pt.velocities[0].linear
     norm = math.sqrt(linear.x ** 2 + linear.y ** 2 + linear.z ** 2)
     if norm < 1e-3:
+      i += step
       continue
     q = geo.vector_to_quat(linear)
     velocity_viz = Marker()
@@ -75,7 +76,6 @@ def trajectory_callback(traj):
     traj_viz.markers.append(velocity_viz)
 
     i += step
-    
   viz_pub.publish(traj_viz)
 
   # visualize information of the next 3 waypoints
@@ -141,6 +141,7 @@ if __name__ == "__main__":
   odometry_sub = rospy.Subscriber(odometry_message_name, Odometry, odometry_callback)
   linear_speed_pub = rospy.Publisher(linear_speed_topic_name, Float32, queue_size=1)
   position_pub = rospy.Publisher(position_topic_name, OverlayText, queue_size=1)
-  
+
+  rospy.loginfo("Trajectory visualize node ready.")  
   while not rospy.is_shutdown():
     rate.sleep()

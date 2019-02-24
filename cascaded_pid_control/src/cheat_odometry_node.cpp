@@ -71,9 +71,9 @@ namespace cascaded_pid_control {
 	      double dt = current - last_odometry_time_;
         // note: velocities info in twist message is encoded in body frame.
         geometry_msgs::Twist twist_world;
-	      twist_world.linear.x = vx_.Update((odometry.pose.pose.position.x - last_position_.x) / dt, dt);
-	      twist_world.linear.y = vy_.Update((odometry.pose.pose.position.y - last_position_.y) / dt, dt);
-	      twist_world.linear.z = vz_.Update((odometry.pose.pose.position.z - last_position_.z) / dt, dt);
+	      twist_world.linear.x = (odometry.pose.pose.position.x - last_position_.x) / dt;
+	      twist_world.linear.y = (odometry.pose.pose.position.y - last_position_.y) / dt;
+	      twist_world.linear.z = (odometry.pose.pose.position.z - last_position_.z) / dt;
         
         geometry_msgs::TransformStamped transform_stamped_inverse = buffer_.lookupTransform("uav/imu", "world", ros::Time(0));
         tf2::doTransform(twist_world.linear, odometry.twist.twist.linear, transform_stamped_inverse);

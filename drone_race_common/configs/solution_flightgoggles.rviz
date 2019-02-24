@@ -7,6 +7,7 @@ Panels:
         - /Status1
         - /GT GATES MarkerArray1/Namespaces1
         - /EGO TRAJECTORY Marker1/Namespaces1
+        - /TF1
         - /TF1/Frames1
       Splitter Ratio: 0.50555557
     Tree Height: 552
@@ -56,7 +57,7 @@ Visualization Manager:
       Marker Topic: /gt_gates_publisher/gt_visualization
       Name: GT GATES MarkerArray
       Namespaces:
-        "": true
+        {}
       Queue Size: 100
       Value: true
     - Alpha: 0.25
@@ -88,7 +89,7 @@ Visualization Manager:
       Frame Timeout: 15
       Frames:
         All Enabled: false
-        uav/camera/center:
+        uav/camera/left:
           Value: false
         uav/imu:
           Value: true
@@ -104,7 +105,7 @@ Visualization Manager:
       Tree:
         world:
           uav/imu:
-            uav/camera/center:
+            uav/camera/left:
               {}
           world/ned:
             {}
@@ -115,7 +116,7 @@ Visualization Manager:
       Marker Topic: /traj_viz/trajectory_viz
       Name: Trajectory
       Namespaces:
-        "": true
+        {}
       Queue Size: 100
       Value: true
     - Buffer length: 100

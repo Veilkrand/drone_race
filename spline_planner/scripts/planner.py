@@ -13,9 +13,12 @@ import math
 from geometry_msgs.msg import PoseArray, Pose, Point, Transform, Twist, Vector3, Quaternion
 from nav_msgs.msg import Odometry
 from trajectory_msgs.msg import MultiDOFJointTrajectory, MultiDOFJointTrajectoryPoint
+from visualization_msgs.msg import Marker
+from std_msgs.msg import ColorRGBA
 from scipy.interpolate import interp1d
 import ros_geometry as geo
 from SmoothedPath import SmoothedPath
+from LowPassFilter import LowPassFilter
 import numpy as np
 
 from dynamic_reconfigure.server import Server
@@ -35,6 +38,10 @@ class SplinePlanner():
         self.gates_sub = rospy.Subscriber('gt_gates_publisher/gt_gates', PoseArray, self.gates_callback)
         self.odometry_sub = rospy.Subscriber('/' + self._namespace + '/odometry_sensor1/odometry', Odometry, self.odometry_callback)
         self.traj_pub = rospy.Publisher('/' + _namespace + '/command/trajectory', MultiDOFJointTrajectory, queue_size=1, latch=True)
+        self.raw_waypoints_viz_pub = rospy.Publisher("~raw_waypoints_viz", Marker, queue_size=1, latch=True)
+        self.current_path = None
+        self.last_position = None
+        self.target_gate_idx = None
 
     def reconfigure_parameters(self, config, level):
         rospy.loginfo("Parameters reconfiguration requested.")
@@ -54,6 +61,9 @@ trajectory_length: {trajectory_length}""".format(**config))
     def gates_callback(self, msg):
         self.gates = msg.poses
         # print("gates_callback " + str(msg.poses))
+        if self.target_gate_idx is None:
+            self.target_gate_idx = 0
+            rospy.loginfo("Next gate index: {}".format(self.target_gate_idx))
 
     def odometry_callback(self, msg):
         # http://docs.ros.org/melodic/api/nav_msgs/html/msg/Odometry.html
@@ -66,13 +76,27 @@ trajectory_length: {trajectory_length}""".format(**config))
                     #print("Visited gate:")
                     #print(str(gate))
 
+        current_position = geo.vector_to_list(self.odometry.pose.pose.position)
+        # print(current_position, self.last_position)
+        if self.last_position is not None and self.target_gate_idx is not None:
+            # check if the drone has crossed the gate
+            current_gate_location = geo.vector_to_list(self.gates[self.target_gate_idx].position)
+            if self.is_cross_gate(self.target_gate_idx, self.last_position, current_position):
+                rospy.loginfo("Passed gate {}".format(self.target_gate_idx))
+                self.target_gate_idx += 1
+                rospy.loginfo("Next gate index: {}".format(self.target_gate_idx))
+                if self.target_gate_idx >= len(self.gates):
+                    rospy.loginfo("All gates have beed visited.")
+            
+        self.last_position = current_position
+
     def start(self):
         rate = rospy.Rate(1)
         started = False
         while not rospy.is_shutdown():
             if started and False:
                 pass
-            elif len(self.gates) > 0 and self.odometry is not None:
+            elif len(self.gates) > 0 and self.odometry is not None and self.target_gate_idx is not None:
                 trajectory = self.create_path(self.odometry, self.gates, self.last_visited_gate)
                 if trajectory is None:
                      print("Failed to create trajectory")
@@ -87,11 +111,75 @@ trajectory_length: {trajectory_length}""".format(**config))
                 print("spline_planner waiting for input")
             rate.sleep()
 
+    def search_for_nearest_waypoint(self, position):
+        for i in range(len(self.current_path['path']) - 1, -1, -1):
+            # point in path format: ((s, t), (pt, deriv1))
+            prev_pt = self.current_path['path'][i - 1]["point_as_list"]
+            next_pt = self.current_path['path'][i]["point_as_list"]
+            vec_ref = np.array(next_pt) - np.array(prev_pt)
+            vec = np.array(next_pt) - np.array(position)
+            if np.dot(vec, vec_ref) <= 0:
+                return i
+                #return i + 1 if i < len(self.current_path['path']) - 1 else i
+        return 0
+
+    def distance_to_gate(self, position, gate_index):
+        if self.gates is None or gate_index >= len(self.gates):
+            rospy.logwarn("Currently no gates information or do not have gate at index {}. Will return a very large value".format(gate_index))
+            return 1e6
+
+        gate_loc = geo.vector_to_list(self.gates[gate_index].position)
+        return SplinePlanner.distance(gate_loc, position)
+
+    @staticmethod
+    def distance(p1, p2):
+        return np.linalg.norm(np.array(p1) - np.array(p2))
+
+    def is_cross_gate(self, gate_index, position_before, position_after):
+        if SplinePlanner.distance(position_before, position_after) < 1e-5:
+            # the two positions are too close
+            return False
+        gate_orientation = self.gates[gate_index].orientation
+        gate_heading = geo.rotate_vector_wrt_quaternion(gate_orientation, Vector3(1, 0, 0))
+        gate_normal_xy = np.array([-gate_heading.y, gate_heading.x])
+
+        gate_position = np.array(geo.vector_to_list(self.gates[gate_index].position))
+        position_before_xy = (np.array(position_before) - gate_position)[:2]
+        position_after_xy = (np.array(position_after) - gate_position)[:2]
+
+        return np.cross(position_before_xy, gate_normal_xy) * np.cross(position_after_xy, gate_normal_xy) < 0
+
+    @staticmethod
+    def is_cross_position(target_position, position_before, position_after):
+        if SplinePlanner.distance(position_before, position_after) < 1e-5:
+            # the two position is too close
+            return False
+        vec1 = np.array(target_position) - np.array(position_before)
+        vec2 = np.array(target_position) - np.array(position_after)
+        if np.dot(vec1, vec2) < 0:
+            # the two vectors are in the opposite direction, so we think we have cross the target position
+            return True
+        return False
+
+    @staticmethod
+    def is_cross_position_debug(target_position, position_before, position_after):
+        print("Distance: ", SplinePlanner.distance(position_before, position_after))
+        if SplinePlanner.distance(position_before, position_after) < 1e-5:
+            # the two position is too close
+            return False
+        vec1 = np.array(target_position) - np.array(position_before)
+        vec2 = np.array(target_position) - np.array(position_after)
+        print("Vec1: ", vec1)
+        print("Vec2: ", vec2)
+        print("Dot: ", np.dot(vec1, vec2))
+        if np.dot(vec1, vec2) < 0:
+            # the two vectors are in the opposite direction, so we think we have cross the target position
+            return True
+        return False
+
     def create_path(self, odometry, gates, last_visited_gate): # types are Odometry, [Pose], Pose
         start_position = odometry.pose.pose.position
         start_velocity = geo.rotate_vector_wrt_quaternion(odometry.pose.pose.orientation, odometry.twist.twist.linear)
-        print("start v:", start_velocity)
-        start_time = odometry.header.stamp
         if last_visited_gate is not None:
             visited_index = None
             for i in range(len(gates)):
@@ -100,37 +188,97 @@ trajectory_length: {trajectory_length}""".format(**config))
             if visited_index is not None:
                 gates = gates[visited_index+1:] + gates[:visited_index+1]
 
-        waypoints = [start_position]
-        #start_speed = geo.magnitude_vector(start_velocity)
-        #if start_speed > 0.3:
-        #    waypoints.append(geo.point_plus_vector(start_position, geo.normalize(start_velocity, 0.1)))
+        # in case of re-planning, determine the current nearest waypoint. look forward about some specific 
+        # time into the current path (currently 1s) and let that future waypoint be the starting waypoint of 
+        # re-planning
+        waypoints = []
+        start = geo.vector_to_list(start_position)
+        look_ahead_time = 1
+        nearest_waypoint_idx = None
+        planning_waypoint_idx = None
+        current_gate_location = geo.vector_to_list(self.gates[self.target_gate_idx].position)
+        if self.current_path is not None:
+            nearest_waypoint_idx = self.search_for_nearest_waypoint(geo.vector_to_list(start_position))
+            if nearest_waypoint_idx >= 0:
+                current_path = self.current_path["path"]
+                waypoints.append(current_path[nearest_waypoint_idx]["point_as_list"])
 
-        for gate in gates:
-            for offset in [-0.5, 0.5]:
-                waypoints.append(geo.point_plus_vector(gate.position, geo.quaternion_to_vector(gate.orientation, offset)))
+                waypoint_time = current_path[nearest_waypoint_idx]["time"]
 
-        # in case of re-planning, we'd want the curvature at the starting point of the resulting path is the 
-        # same as first waypoint we feed. so we will fix the derivative of the first point.
-        #
-        # so: || omega || = || v || * k
-        # k = || omega || / || v ||
-        v = np.array([start_velocity.x,
-                      start_velocity.y,
-                      start_velocity.z])
-        # on the other hands, k = norm(deriv1 x dervi2) / norm(deriv1) ** 3
-        #                       = || deriv1 || * || deriv2 || * sin(theta) / || deriv1 || ** 3
-        #                       = || deriv2 || * sin(theta) / || deriv1 || ** 2
-        #          || deriv1 || = sqrt(|| deriv2 || * sin(theta) / k)
+                planning_waypoint_idx = nearest_waypoint_idx
+                current_path_length = len(current_path)
+                while planning_waypoint_idx < current_path_length:
+                    planning_waypoint = current_path[planning_waypoint_idx]
+                    if planning_waypoint["time"] - waypoint_time < look_ahead_time:
+                        planning_waypoint_idx += 1
+                    else:
+                        break
+                if planning_waypoint_idx >= current_path_length:
+                    planning_waypoint_idx = current_path_length - 1
+                start_position = current_path[planning_waypoint_idx]["point_as_list"]
+                waypoints.append(start_position)
+        
+        if len(waypoints) == 0:
+            print("The first planning or a re-planning from scratch is needed.")
+            orientation = np.array(current_gate_location) - np.array(start)
+            orientation_normalized = orientation / np.linalg.norm(orientation)
+            # append a point 5 meters behind along with the current position as the starting position
+            waypoints.append((np.array(start) - 5 * orientation_normalized).tolist())
+            waypoints.append(start)
+        else:
+            print("Re-planning")
+
+        # we already have two position around current position,
+        # we still need 2 positionp around the gate
+        # 
+        # make sure we won't going back if we're still heading to the current gate
+        # and if we're too close to the target gate, head for the next too.
+        target_gate_location = geo.vector_to_list(self.gates[self.target_gate_idx].position)
+        if self.is_cross_gate(self.target_gate_idx, waypoints[0], waypoints[1]):
+            rospy.loginfo("About to cross gate{}. Heading for next gate at index {}".format(self.target_gate_idx, self.target_gate_idx + 1))
+            gate = self.gates[self.target_gate_idx + 1]
+        elif self.distance_to_gate(waypoints[0], self.target_gate_idx) <= 0.5 or \
+              self.distance_to_gate(waypoints[1], self.target_gate_idx) <= 0.5:
+            rospy.loginfo("Close to gate {}. Heading for gate at index {}".format(self.target_gate_idx, self.target_gate_idx + 1))
+            gate = self.gates[self.target_gate_idx + 1]
+        else:
+            gate = self.gates[self.target_gate_idx]
+
+        # append +- 0.5 meters around the next gate
+        for offset in [-0.5, 0.5]:
+            waypoints.append(
+                geo.vector_to_list(
+                    geo.point_plus_vector(gate.position, geo.quaternion_to_vector(gate.orientation, offset))))
+
+        # wp = np.array(waypoints)
+        # w0 = wp[:-1]
+        # w1 = wp[1:]
+        # diff = w0 - w1
+        # norm = np.linalg.norm(diff, axis=1)
+        # new_path_chord_length = np.sum(norm)
+                
+        # scale derivative w.r.t. total chord length
+        # if deriv is not None:
+        #    old_path_chord_length = self.current_path["chord_length"]
+        #    ratio = min(new_path_chord_length / old_path_chord_length, 1.0)
+        #    deriv = list(ratio * v for v in deriv)
+        raw_waypoints_marker = Marker()
+        raw_waypoints_marker.header.stamp = rospy.Time.now()
+        raw_waypoints_marker.header.frame_id = "world"
+        raw_waypoints_marker.color = ColorRGBA(1.0, 1.0, 0.0, 1.0)
+        raw_waypoints_marker.scale = Vector3(0.5, 0.5, 0.5)
+        raw_waypoints_marker.type = Marker.SPHERE_LIST
+        raw_waypoints_marker.action = Marker.ADD
+        raw_waypoints_marker.id = 1
+        for wp in waypoints:
+            raw_waypoints_marker.points.append(Point(wp[0], wp[1], wp[2]))
+        self.raw_waypoints_viz_pub.publish(raw_waypoints_marker)
         
         path = SmoothedPath()
-        if np.linalg.norm(v) > 0.5 and False:
-            print(v)
-            path.fit(waypoints, np.array([v]).tolist(), [0])
-        else:
-            path.fit(waypoints)
-        
+        path.fit(waypoints)
+
         trajectory_points = []
-        def visit_cb(pt, deriv1, deriv2, s):
+        def visit_cb(pt, deriv1, deriv2, s, t):
             # curvature is calcuated as norm(deriv1 x deriv2) / norm(deriv1)**3
             # see: https://en.wikipedia.org/wiki/Curvature#Local_expressions_2
             d1xd2 = np.cross(deriv1, deriv2)
@@ -168,7 +316,12 @@ trajectory_length: {trajectory_length}""".format(**config))
                 ds = s - last_point['s']
             
             trajectory_points.append({
+                't': t,
                 's': s,
+                'point_as_list': pt,
+                'derivative': deriv1,
+                'derivative2': deriv2,
+
                 'ds': ds,
                 'point': Vector3(*(pt.tolist())),
                 'speed': self.max_speed,
@@ -178,12 +331,16 @@ trajectory_length: {trajectory_length}""".format(**config))
                 'curvature': c
             })
         path.visit_at_interval(self.ds, visit_cb, self.trajectory_length)
+        self.current_path = { "chord_length" : 0, "path": trajectory_points }
 #        trajectory_points = [{'s': i * ds, 'speed': self.max_speed, 'curvature': geo.spline_distance_to_curvature(waypoint_spline, i*ds)} for i in range(30)]
         vmin = self.min_speed
         vmax = self.max_speed
         amax = self.max_acceleration
 
-        def safe_speed(curvature, speed_neighbor, ds):
+        def safe_speed(curvature, speed_neighbor, ds, accel = None):
+            if accel is not None:
+                return math.sqrt(speed_neighbor ** 2 + 2 * ds * accel)
+
             centripetal = curvature * speed_neighbor**2
             if centripetal >= amax:
                 return max(vmin, min(vmax, math.sqrt(abs(amax / curvature))))
@@ -193,15 +350,25 @@ trajectory_length: {trajectory_length}""".format(**config))
             v_this = math.sqrt(speed_neighbor ** 2 + 2 * ds * remaining_acceleration)
             return max(vmin, min(vmax, v_this))
 
-        trajectory_points[0]['speed'] = min(vmax, max(vmin, geo.magnitude_vector(start_velocity)))
+        #print(geo.magnitude_vector(start_velocity))
+        # trajectory_points[0]['speed'] = min(vmax, max(vmin, geo.magnitude_vector(start_velocity)))
+        trajectory_points[0]['speed'] = geo.magnitude_vector(start_velocity)
+        #print(trajectory_points[0]['speed'])
         num_traj = len(trajectory_points)
         for i in range(num_traj - 1): # iterate forwards, skipping first point which is fixed to current speed
             trajectory_points[i+1]['speed'] = safe_speed(trajectory_points[i+1]['curvature'], trajectory_points[i]['speed'], trajectory_points[i+1]['ds'])
-        for i in range(num_traj - 2):
-            j = num_traj - i - 2 # iterate backwards, skipping both end points
-            curvature = trajectory_points[j]['curvature']
-            min_neighbor_speed = min(trajectory_points[j-1]['speed'],trajectory_points[j+1]['speed'])
-            trajectory_points[j]['speed'] = safe_speed(curvature, min_neighbor_speed, trajectory_points[i+1]['ds'])
+        # skip the backward phase for 2 reason:
+        #   1. we don't need a smooth stop. just complete the course
+        #      asap
+        #   2. backward phase would change the start speed,
+        #      usually slower than the current speed. this
+        #      sudden change of speed would make the drone
+        #      "jerking" between trajectory switch.
+        # for i in range(num_traj - 2):
+        #    j = num_traj - i - 2 # iterate backwards, skipping both end points
+        #    curvature = trajectory_points[j]['curvature']
+        #    min_neighbor_speed = min(trajectory_points[j-1]['speed'],trajectory_points[j+1]['speed'])
+        #    trajectory_points[j]['speed'] = safe_speed(curvature, min_neighbor_speed, trajectory_points[i+1]['ds'])
 
         # Set velocity based on speed and direction
         for point in trajectory_points:
@@ -226,6 +393,16 @@ trajectory_length: {trajectory_length}""".format(**config))
             ave_speed = 0.5 * (trajectory_points[i]['speed'] + trajectory_points[i+1]['speed'])
             trajectory_points[i+1]['time'] = prev_time + ds / ave_speed
 
+        # low pass filter on the designated speed.
+        lpf = LowPassFilter(trajectory_points[0]['speed'], 5)
+        for i in range(1, num_traj):
+            trajectory_points[i]['speed'] = lpf.update(trajectory_points[i]['speed'], trajectory_points[i]['time'])
+        
+        # print(geo.magnitude_vector(start_velocity))
+        # for pt in trajectory_points:
+        #     print(pt['speed'])
+        # print("------")
+
         # Set acceleration based on change in velocity
         # we're assuming constant accelerations between waypoints,
         # a is just \delta V / \delta t
@@ -249,9 +426,10 @@ trajectory_length: {trajectory_length}""".format(**config))
 
         trajectory = MultiDOFJointTrajectory()
         trajectory.header.frame_id=''
-        trajectory.header.stamp = start_time
         trajectory.joint_names = ['base']
-        for point in trajectory_points[10:]:
+        for idx in range(len(trajectory_points)):
+            point = trajectory_points[idx]
+            point['time'] = trajectory_points[idx]['time']
             transform = Transform()
             transform.translation = point['point']
             transform.rotation = Quaternion(*(geo.vector_to_quat(point['velocity']).tolist()))
@@ -265,6 +443,7 @@ trajectory_length: {trajectory_length}""".format(**config))
             
             trajectory.points.append(MultiDOFJointTrajectoryPoint([transform], [velocity], [acceleration], rospy.Duration(point['time'])))
 
+        trajectory.header.stamp = rospy.Time.now()
         return trajectory
 
         # return MultiDOFJointTrajectory

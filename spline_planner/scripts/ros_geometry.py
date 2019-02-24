@@ -7,6 +7,9 @@ import tf.transformations
 def distance(point1, point2):
     return math.sqrt( (point2.x-point1.x)**2 + (point2.y-point1.y)**2 + (point2.z-point1.z)**2 )
 
+def vector_to_list(vec):
+    return [vec.x, vec.y, vec.z]
+
 def vector_from_to(p0, p1):
     v = Vector3()
     v.x = p1.x - p0.x
@@ -72,11 +75,20 @@ def quaternion_to_vector(quaternion, magnitude=1.0):
     tf_euler = tf.transformations.euler_from_quaternion(tf_quat)
     return rpy_to_vector(tf_euler[0],tf_euler[1],tf_euler[2], magnitude)
 
-def rotate_vector_wrt_quaternion(q, v):
-    tf_quat = np.array([q.x, q.y, q.z, q.w])
-    tf_vec = np.array([v.x, v.y, v.z])
-    result = np.matmul(tf.transformations.quaternion_matrix(tf_quat)[:3, :3], tf_vec)
-    return Vector3(*(result.tolist()))
+def rotate_vector_wrt_quaternion(quaternion, vector):
+    p = np.array([vector.x, vector.y, vector.z, 0])
+    q = np.array([quaternion.x, quaternion.y, quaternion.z, quaternion.w])
+    # p' = q * p * q'
+    p_prime = tf.transformations.quaternion_multiply(
+                tf.transformations.quaternion_multiply(q, p),
+                tf.transformations.quaternion_inverse(q))
+    return Vector3(*(p_prime[:3].tolist()))
+
+#def rotate_vector_wrt_quaternion(q, v):
+#    tf_quat = np.array([q.x, q.y, q.z, q.w])
+#    tf_vec = np.array([v.x, v.y, v.z])
+#    result = np.matmul(tf.transformations.quaternion_matrix(tf_quat)[:3, :3], tf_vec)
+#    return Vector3(*(result.tolist()))
 
 def rpy_to_quat(roll, pitch, yaw):
     quaternion_array = tf.transformations.quaternion_from_euler(roll, pitch, yaw, 'rxyz')
