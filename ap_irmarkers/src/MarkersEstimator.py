@@ -55,6 +55,7 @@ class MarkersEstimator:
 
         if len(pts) == 4:
             pts = np.array(pts, dtype="double").reshape(4, 1, 2) #it needs to be reshaped for Ransac
+
             # print(pts)
             objp = np.array([ (self.gate_w,self.gate_w,0),
                               (-self.gate_w,self.gate_w,0),
