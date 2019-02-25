@@ -88,7 +88,7 @@ trajectory_length: {trajectory_length}""".format(**config))
                     self.target_gate_idx += 1
                     rospy.loginfo("Next gate index: {}".format(self.target_gate_idx))
                 else:
-                    rospy.loginfo("All gates have beed visited.")
+                    rospy.loginfo("All gates have been visited.")
             
         self.last_position = current_position
 
@@ -101,7 +101,9 @@ trajectory_length: {trajectory_length}""".format(**config))
                     pass
                 elif len(self.gates) > 0 and self.odometry is not None and self.target_gate_idx is not None:
                     trajectory = self.create_path(self.odometry, self.gates, self.last_visited_gate)
-                    if trajectory is None:
+                    if self.stop_planning:
+                        rospy.loginfo("All gates have been visited. Planning stopped.")
+                    elif trajectory is None:
                         print("Failed to create trajectory")
                     else:
                         self.traj_pub.publish(trajectory)
@@ -245,6 +247,7 @@ trajectory_length: {trajectory_length}""".format(**config))
                 rospy.loginfo("Gates are about to be all passed. Stop planning.")
                 gate = self.gates[self.target_gate_idx]
                 self.stop_planning = True
+                return
         elif self.distance_to_gate(waypoints[0], self.target_gate_idx) <= 0.5 or \
               self.distance_to_gate(waypoints[1], self.target_gate_idx) <= 0.5:
             if self.target_gate_idx + 1 < len(self.gates):
@@ -254,11 +257,13 @@ trajectory_length: {trajectory_length}""".format(**config))
                 rospy.loginfo("Gates are about to be all passed. Stop planning.")
                 gate = self.gates[self.target_gate_idx]
                 self.stop_planning = True
+                return
         else:
             gate = self.gates[self.target_gate_idx]
 
-        # append +- 0.5 meters around the next gate
-        for offset in [-0.5, 0.5]:
+        # append waypoints +- 0.5 meters around the next gate
+        offsets = [-0.5, 0.5]
+        for offset in offsets:
             waypoints.append(
                 geo.vector_to_list(
                     geo.point_plus_vector(gate.position, geo.quaternion_to_vector(gate.orientation, offset))))
