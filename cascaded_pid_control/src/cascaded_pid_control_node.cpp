@@ -162,7 +162,7 @@ namespace cascaded_pid_control {
 
     rate_thrust_pub_ = private_nh_.advertise<mav_msgs::RateThrust>("rateThrust", 1);
     odometry_sub_ = private_nh_.subscribe<nav_msgs::Odometry>("odometry", 1, &CascadedPidControl::OdometryCallback, this);
-    trajectory_sub_ = private_nh_.subscribe<trajectory_msgs::MultiDOFJointTrajectory>("trajectory", 1, &CascadedPidControl::TrajectoryCallback, this);
+    trajectory_sub_ = private_nh_.subscribe<trajectory_msgs::MultiDOFJointTrajectory>("trajectory", 1, &CascadedPidControl::TrajectoryCallbackNew, this);
 
     if (publish_debug_topic_) {
       position_setpoint_pub_ = private_nh_.advertise<geometry_msgs::Vector3>("positionSetpoint", 8);
@@ -253,6 +253,103 @@ namespace cascaded_pid_control {
     position_error_pub_.publish(pos_error);
     velocity_error_pub_.publish(vel_error);
     attitude_error_pub_.publish(att_error);
+  }
+
+  void CascadedPidControl::TrajectoryCallbackNew(const trajectory_msgs::MultiDOFJointTrajectoryConstPtr& ptr) {
+    // Merge the new coming trajectory with the current one that being executed.
+
+    // Some preconditions: because the planner with use part of the old trajectory to generate
+    // the new trajectory, there should be some waypoints overlapping (otherwise the controller
+    // is executing more waypoints than the planner could re-generate. the rate of the planner 
+    // should be raised)
+    //
+    // so the idea is, find out the waypoint in the in coming trajectory that is closest to the
+    // current set point (in ideal case, the distance should be 0 since they are overlapping).
+    // from that point, keep comparing waypoints until they diverge (distance greater than some
+    // threshold). from the point they diverge, we have a new trajectory segement. subsitude the new
+    // segment with the corresponding part in the trajectory the controller is going to execute.
+    //
+
+    if (ptr->points.size() == 0) {
+      ROS_WARN("Empty trajectory.");
+      return;
+    }
+
+    ROS_INFO("New trajectory arrived.");
+
+    bool should_restart = traj_points_.size() == 0;
+
+    mav_msgs::EigenTrajectoryPoint eigen_traj_point;
+    std::vector<mav_msgs::EigenTrajectoryPoint> new_trajectory;
+    std::vector<double> new_wait_time;
+    double closest_dist = 1e9;
+    std::size_t best_match = -1;
+    auto iter = ptr->points.begin();
+    double last_time = -1;
+    // find out the best matching waypoint in the new coming trajectory with 
+    // the current set point.
+    for (auto iter = ptr->points.begin(); iter != ptr->points.end(); ++iter) {
+      mav_msgs::eigenTrajectoryPointFromMsg(*iter, &eigen_traj_point);
+      new_trajectory.push_back(eigen_traj_point);
+      double dist = (eigen_traj_point.position_W - set_point_.position_W).norm();
+      if (dist < closest_dist) {
+        closest_dist = dist;
+        best_match = iter - ptr->points.begin();
+      }
+      if (last_time >= 0) {
+        double dt = iter->time_from_start.toSec() - last_time;
+        new_wait_time.push_back(dt);
+      }
+      last_time = iter->time_from_start.toSec();
+    }
+
+    // continue looking forward until the new trajectory diverge with the current trajectory
+    std::size_t current_j = 0;
+    std::size_t new_j = best_match;
+    for (;
+         current_j < traj_points_.size() - 1 && new_j < new_trajectory.size() - 1;
+         ++current_j, ++new_j) {
+      if ((traj_points_[current_j].position_W - new_trajectory[new_j].position_W).norm() > 0.1) {
+        break;
+      }
+    }
+    ROS_DEBUG_STREAM("New trajectory start overlapping with the current one at waypoint index "<< best_match
+      << ", diverge from " << new_j << " (waypoint index " << current_j << " in the current path)");
+
+    std::size_t j = new_j;
+    
+    // substitude segement in the new trajectory from new_j with the one in the current trajectory
+    // from current_j
+    for (; current_j < traj_points_.size() && new_j < new_trajectory.size(); ++current_j, ++new_j) {
+      traj_points_[current_j] = new_trajectory[new_j];
+    }
+    while (current_j < traj_points_.size()) {
+      traj_points_.pop_back();
+    }
+    if (new_j < new_trajectory.size()) {
+      std::copy(new_trajectory.begin() + new_j, new_trajectory.end(), std::back_inserter(traj_points_));
+    }
+
+    // command wait time update.
+    command_wait_time_.resize(j - 1);
+    std::copy(new_wait_time.begin() + j, new_wait_time.end(), std::back_inserter(command_wait_time_));
+    ROS_DEBUG_STREAM("New trajectory length: " << traj_points_.size() << ", command wait time queue length: " << command_wait_time_.size() << ".");
+
+    if (should_restart) {
+      ROS_DEBUG("Restarting waypoint following routine.");
+      if (!traj_points_.empty()) {
+        SetNextPoint(traj_points_.front());
+        traj_points_.pop_front();
+        if (!traj_points_.empty()) {
+          double wait_time = command_wait_time_.front();
+          command_wait_time_.pop_front();
+          timer_.stop();
+          timer_.setPeriod(ros::Duration(wait_time));
+          timer_.start();
+        }
+      }
+    }
+    ROS_INFO("New trajectory is successfully merged into the exising trajectory.");
   }
 
   void CascadedPidControl::TrajectoryCallback(const trajectory_msgs::MultiDOFJointTrajectoryConstPtr& ptr) {

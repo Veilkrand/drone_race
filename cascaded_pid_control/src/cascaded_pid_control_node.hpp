@@ -82,6 +82,7 @@ namespace cascaded_pid_control {
 
     void OdometryCallback(const nav_msgs::OdometryConstPtr &ptr);
     void TrajectoryCallback(const trajectory_msgs::MultiDOFJointTrajectoryConstPtr& ptr);
+    void TrajectoryCallbackNew(const trajectory_msgs::MultiDOFJointTrajectoryConstPtr& ptr);    
 
     void TimerCallback(const ros::TimerEvent& e);
 
