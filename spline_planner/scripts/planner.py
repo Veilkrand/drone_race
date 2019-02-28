@@ -42,6 +42,7 @@ class SplinePlanner():
         self.current_path = None
         self.last_position = None
         self.target_gate_idx = None
+        self.stop_planning = False
 
     def reconfigure_parameters(self, config, level):
         rospy.loginfo("Parameters reconfiguration requested.")
@@ -83,32 +84,36 @@ trajectory_length: {trajectory_length}""".format(**config))
             current_gate_location = geo.vector_to_list(self.gates[self.target_gate_idx].position)
             if self.is_cross_gate(self.target_gate_idx, self.last_position, current_position):
                 rospy.loginfo("Passed gate {}".format(self.target_gate_idx))
-                self.target_gate_idx += 1
-                rospy.loginfo("Next gate index: {}".format(self.target_gate_idx))
-                if self.target_gate_idx >= len(self.gates):
-                    rospy.loginfo("All gates have beed visited.")
+                if self.target_gate_idx + 1 < len(self.gates):
+                    self.target_gate_idx += 1
+                    rospy.loginfo("Next gate index: {}".format(self.target_gate_idx))
+                else:
+                    rospy.loginfo("All gates have been visited.")
             
         self.last_position = current_position
 
     def start(self):
-        rate = rospy.Rate(1)
+        rate = rospy.Rate(2)
         started = False
         while not rospy.is_shutdown():
-            if started and False:
-                pass
-            elif len(self.gates) > 0 and self.odometry is not None and self.target_gate_idx is not None:
-                trajectory = self.create_path(self.odometry, self.gates, self.last_visited_gate)
-                if trajectory is None:
-                     print("Failed to create trajectory")
+            if not self.stop_planning:
+                if started and False:
+                    pass
+                elif len(self.gates) > 0 and self.odometry is not None and self.target_gate_idx is not None:
+                    trajectory = self.create_path(self.odometry, self.gates, self.last_visited_gate)
+                    if self.stop_planning:
+                        rospy.loginfo("All gates have been visited. Planning stopped.")
+                    elif trajectory is None:
+                        print("Failed to create trajectory")
+                    else:
+                        self.traj_pub.publish(trajectory)
+                        if not started:
+                            started = True
+                            print("spline_planner published first trajectory")
+                        #print("Trajectory:")
+                        #print(str(trajectory))
                 else:
-                    self.traj_pub.publish(trajectory)
-                    if not started:
-                        started = True
-                        print("spline_planner published first trajectory")
-                    #print("Trajectory:")
-                    #print(str(trajectory))
-            else:
-                print("spline_planner waiting for input")
+                    print("spline_planner waiting for input")
             rate.sleep()
 
     def search_for_nearest_waypoint(self, position):
@@ -235,17 +240,30 @@ trajectory_length: {trajectory_length}""".format(**config))
         # and if we're too close to the target gate, head for the next too.
         target_gate_location = geo.vector_to_list(self.gates[self.target_gate_idx].position)
         if self.is_cross_gate(self.target_gate_idx, waypoints[0], waypoints[1]):
-            rospy.loginfo("About to cross gate{}. Heading for next gate at index {}".format(self.target_gate_idx, self.target_gate_idx + 1))
-            gate = self.gates[self.target_gate_idx + 1]
+            if self.target_gate_idx + 1 < len(self.gates):
+                rospy.loginfo("About to cross gate{}. Heading for next gate at index {}".format(self.target_gate_idx, self.target_gate_idx + 1))
+                gate = self.gates[self.target_gate_idx + 1]
+            else:
+                rospy.loginfo("Gates are about to be all passed. Stop planning.")
+                gate = self.gates[self.target_gate_idx]
+                self.stop_planning = True
+                return
         elif self.distance_to_gate(waypoints[0], self.target_gate_idx) <= 0.5 or \
               self.distance_to_gate(waypoints[1], self.target_gate_idx) <= 0.5:
-            rospy.loginfo("Close to gate {}. Heading for gate at index {}".format(self.target_gate_idx, self.target_gate_idx + 1))
-            gate = self.gates[self.target_gate_idx + 1]
+            if self.target_gate_idx + 1 < len(self.gates):
+                rospy.loginfo("Close to gate {}. Heading for gate at index {}".format(self.target_gate_idx, self.target_gate_idx + 1))
+                gate = self.gates[self.target_gate_idx + 1]
+            else:
+                rospy.loginfo("Gates are about to be all passed. Stop planning.")
+                gate = self.gates[self.target_gate_idx]
+                self.stop_planning = True
+                return
         else:
             gate = self.gates[self.target_gate_idx]
 
-        # append +- 0.5 meters around the next gate
-        for offset in [-0.5, 0.5]:
+        # append waypoints +- 0.5 meters around the next gate
+        offsets = [-0.5, 0.5]
+        for offset in offsets:
             waypoints.append(
                 geo.vector_to_list(
                     geo.point_plus_vector(gate.position, geo.quaternion_to_vector(gate.orientation, offset))))

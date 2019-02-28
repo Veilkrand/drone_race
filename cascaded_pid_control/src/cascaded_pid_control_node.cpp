@@ -302,6 +302,8 @@ namespace cascaded_pid_control {
       }
       last_time = iter->time_from_start.toSec();
     }
+    ROS_INFO("New trajectory is built. Length: %zu, number of wait commands: %zu", new_trajectory.size(), new_wait_time.size());
+    ROS_INFO("Merging the new trajectory with current one.");
 
     // continue looking forward until the new trajectory diverge with the current trajectory
     std::size_t current_j = 0;
@@ -313,30 +315,37 @@ namespace cascaded_pid_control {
         break;
       }
     }
-    ROS_DEBUG_STREAM("New trajectory start overlapping with the current one at waypoint index "<< best_match
-      << ", diverge from " << new_j << " (waypoint index " << current_j << " in the current path)");
-
-    std::size_t j = new_j;
+    ROS_INFO("New trajectory start overlapping with the current one at waypoint index %zu, diverge from %zu (waypoint index %zu in the current path)", best_match, new_j, current_j);
     
     // substitude segement in the new trajectory from new_j with the one in the current trajectory
     // from current_j
-    for (; current_j < traj_points_.size() && new_j < new_trajectory.size(); ++current_j, ++new_j) {
+    std::size_t num_copied = 0;
+    std::size_t copy_current_j = current_j;
+    std::size_t copy_new_j = new_j;
+    while (copy_current_j < traj_points_.size() && copy_new_j < new_trajectory.size()) {
       traj_points_[current_j] = new_trajectory[new_j];
+      ++copy_current_j;
+      ++copy_new_j;
+      ++num_copied;
     }
-    while (current_j < traj_points_.size()) {
-      traj_points_.pop_back();
-    }
-    if (new_j < new_trajectory.size()) {
-      std::copy(new_trajectory.begin() + new_j, new_trajectory.end(), std::back_inserter(traj_points_));
+    ROS_INFO("%zu waypoints copied from new trajectory within from %zu to %zu to the current trajectory from %zu to %zu.",
+          num_copied, new_j, copy_new_j, current_j, copy_current_j);
+    ROS_INFO("Truncate number of waypoints to %zu.", copy_current_j);
+    traj_points_.resize(copy_current_j);
+
+    if (copy_new_j < new_trajectory.size()) {
+      ROS_INFO("There're still waypoints in the new trajectory, starting from index %zu", copy_new_j);
+      std::copy(new_trajectory.begin() + copy_new_j, new_trajectory.end(), std::back_inserter(traj_points_));
     }
 
     // command wait time update.
-    command_wait_time_.resize(j - 1);
-    std::copy(new_wait_time.begin() + j, new_wait_time.end(), std::back_inserter(command_wait_time_));
-    ROS_DEBUG_STREAM("New trajectory length: " << traj_points_.size() << ", command wait time queue length: " << command_wait_time_.size() << ".");
+    command_wait_time_.resize(current_j);
+    std::copy(new_wait_time.begin() + new_j, new_wait_time.end(), std::back_inserter(command_wait_time_));
+
+    ROS_INFO_STREAM("New trajectory length: " << traj_points_.size() << ", command wait time queue length: " << command_wait_time_.size() << ".");
 
     if (should_restart) {
-      ROS_DEBUG("Restarting waypoint following routine.");
+      ROS_INFO("Starting/restarting waypoint following routine.");
       if (!traj_points_.empty()) {
         SetNextPoint(traj_points_.front());
         traj_points_.pop_front();
@@ -348,6 +357,7 @@ namespace cascaded_pid_control {
           timer_.start();
         }
       }
+      controller_active_ = true;
     }
     ROS_INFO("New trajectory is successfully merged into the exising trajectory.");
   }
