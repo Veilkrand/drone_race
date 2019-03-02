@@ -53,13 +53,89 @@ class QuinticSpline(object):
            np.matmul(np.array([t4, t3, t2, t, 1], dtype=np.float), self.cm_d1).reshape(-1), \
            np.matmul(np.array([t3, t2, t, 1], dtype=np.float), self.cm_d2).reshape(-1)
 
-def propose_geometric_spline_path(p1, p2, p3, t1=None, t3=None, a1=None, a3=None):
+def propose_geometric_spline_path_with_2_points(p1, p2, t1=None, t2=None, a1=None, a2=None):
+  direct12 = p2 - p1
+  if t1 is None:
+    t1 = 0.5 * direct12
+  if t2 is None:
+    t2 = 0.5 * direct12
+  if a1 is None:
+    a1 = np.array([0, 0, 0], dtype=np.float)
+  if a2 is None:
+    a2 = np.array([0, 0, 0], dtype=np.float)
+  return [QuinticSpline(p1, p2, t1, t2, a1, a2)]
+
+def propose_geometric_spline_path(waypoints, derivatives_1=None, derivatives_2=None):
+  # type: (List[int], List[int], List[int]) -> None
+  full_d1 = []
+  full_d2 = []
+  
+  num_waypoints = len(waypoints)
+
+  for i in range(num_waypoints):
+    if derivatives_1 is not None and derivatives_1.has_key(i):
+      full_d1.append(derivatives_1[i])
+    else:
+      if i == 0:
+        direct = waypoints[1] - waypoints[0]
+        full_d1.append(0.5 * direct)
+      elif i == num_waypoints - 1:
+        direct = waypoints[-1] - waypoints[-2]
+        full_d1.append(0.5 * direct)
+      else:
+        direct12 = waypoints[i] - waypoints[i - 1]
+        direct23 = waypoints[i + 1] - waypoints[i]
+        norm_12 = np.linalg.norm(direct12)
+        norm_23 = np.linalg.norm(direct23)
+
+        axis = np.cross(direct12, direct23)
+        axis /= np.linalg.norm(axis)
+        angle = np.arccos(np.dot(direct12, direct23) / (norm_12 * norm_23)) / 2
+
+        t2 = direct12 / norm_12
+        # by Rodrigues' rotation formula
+        t2 = np.cos(angle) * t2 + np.sin(angle) * np.cross(axis, t2) + (1 - np.cos(angle)) * np.dot(axis, t2) * axis
+        t2 *= (0.5 * (min(norm_12, norm_23)))
+        full_d1.append(t2)
+
+  for i in range(num_waypoints):
+    if derivatives_2 is not None and derivatives_2.has_key(i):
+      full_d2.append(derivatives_2[i])
+    else:
+      if i == 0 or i == num_waypoints - 1:
+        full_d2.append(np.array([0, 0, 0], dtype=np.float))
+      else:
+        direct12 = waypoints[i] - waypoints[i - 1]
+        direct23 = waypoints[i + 1] - waypoints[i]
+        norm_12 = np.linalg.norm(direct12)
+        norm_23 = np.linalg.norm(direct23)
+        # see Sprunk[2008] ch4.1.2 for reference
+        p1, p2, p3 = waypoints[i - 1 : i + 2]
+        t1, t2, t3 = full_d1[i - 1 : i + 2]
+        alpha = norm_23 / (norm_12 + norm_23)
+        beta = norm_12 / (norm_12 + norm_23)
+        a2 = alpha * (6 * p1 + 2 * t1 + 4 * t2 - 6 * p2) + beta * (-6 * p2 - 4 * t2 - 2 * t3 + 6 * p3)
+        full_d2.append(a2)
+
+  splines = []
+  for i in range(num_waypoints - 1):
+    p1, p2 = waypoints[i : i + 2]
+    t1, t2 = full_d1[i : i + 2]
+    a1, a2 = full_d2[i : i + 2]
+    splines.append(QuinticSpline(p1, p2, t1, t2, a1, a2))
+
+  return splines
+
+def propose_geometric_spline_path_old(p1, p2, p3, t1=None, t3=None, a1=None, a3=None):
   """Propose quintic splines given:
   1. start position, intermediate position, end position
   2. tangent (first-order derivative) at start position, tangent at end position
   3. second-order derivative at start position and end position
   """
   # type: (np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray) -> list[QuinticSpline]
+  if p3 is None:
+    return propose_geometric_spline_path_with_2_points(p1, p2, t1, t3, a1, a3)
+    
   direct12 = p2 - p1
   direct23 = p3 - p2
 

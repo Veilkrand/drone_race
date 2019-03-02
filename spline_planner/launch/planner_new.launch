@@ -6,7 +6,7 @@
   <!-- Planner node -->
   <node pkg="spline_planner" type="planner_new.py" name="spline_planner" output="screen">
     <remap from="/spline_planner/odometry" to="/CheatOdometryNode/odometry"/>
-    <remap from="/spline_planner/trajectory" to="/CascadedPidControl/trajectoryd" />
+    <remap from="/spline_planner/trajectory" to="/CascadedPidControl/trajectory" />
   </node>
 
   <!-- Gate pose publisher node (cheat gate pose node) -->
@@ -23,7 +23,7 @@
 
   <!-- trajectory visualization topic publisher -->
   <node pkg="spline_planner" type="trajectory_visualizer.py" name="traj_viz">
-    <remap from="~trajectory" to="/CascadedPidControl/trajectoryd"/>
+    <remap from="~trajectory" to="/CascadedPidControl/trajectory"/>
     <remap from="~odometry" to="/CheatOdometryNode/odometry" />
   </node>  
 

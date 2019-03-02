@@ -52,18 +52,18 @@ class SplinePlannerNew(object):
     self.raw_waypoints_viz_pub = None # type: rospy.Publisher
     self.traj_pub = None # type: rospy.Publisher
     self.last_position = None
+    self.current_time = None
     self.current_position = None
     self.current_velocity = None
+    self.current_acceleration = None
     self.target_gate_idx = None
-    self.gates_sequence = [2, 13, 9, 1]
+    self.gates_sequence = [10, 21, 2, 13, 9, 14, 1, 22, 15, 23, 6]
+    self.current_path = None
     self.stop_planning = False
 
   def generate_trajectory(self):
-    waypoints = []
-    look_ahead_time = 1
     # every time when re-planning, there are 3 raw waypoints:
     # the current position, position of the next gate, position of the next next gate
-    # current position has to be looked ahead.
     #
     # in case that the drone is too close to 
     # the next gate, an alternate waypoint from the last trajectory is used instead of the position
@@ -71,16 +71,94 @@ class SplinePlannerNew(object):
     #
     # in case that we don't have a next next gate, a waypoint that is 5 meter away from the last gate
     # along the trajectory direction is used instead
+    look_ahead_time = 2
+    next_gate = self.get_waypoint_for_next_n_gate()
+    wp0 = self.current_position
+    d1 = {}
+    d2 = {}
+    #wp1 = self.get_waypoint_for_next_n_gate(1)
+    #wp2 = self.get_waypoint_for_next_n_gate(2)
+    #if np.linalg.norm(wp1 - wp0) < 0.5:
+    #  wp1 = self.get_waypoint_for_next_n_gate(2)
+    #  wp2 = self.get_waypoint_for_next_n_gate(3)
+    if self.current_path is not None:
+      # find the nearest waypoint, and look ahead from that position. use that as the
+      # start position of replanning.
+      rospy.loginfo("Re-planning")
+      nearest_waypoint_idx = self.search_for_nearest_waypoint(self.current_position)
+      nearest_waypoint_time = self.current_path[nearest_waypoint_idx]['time']
 
-    # TODO: currently look ahead / alternate waypoints selection are not implemented yet
-    next_gate = self.gate_locations[self.target_gate_idx]['center']
-    next_next_gate = self.gate_locations[self.gates_sequence[0]]['center']
-    self.publish_raw_waypoints_viz(self.current_position, next_gate, next_next_gate)
+      planning_start_idx = nearest_waypoint_idx
+      current_path_length = len(self.current_path)
+      while planning_start_idx < current_path_length - 1:
+        point = self.current_path[planning_start_idx]
+        if point['time'] - nearest_waypoint_time >= look_ahead_time:
+          break
+        planning_start_idx += 1
+      wp1 = self.current_path[planning_start_idx]['point']
+      d1[1] = self.current_path[planning_start_idx]['d1']
+      d2[1] = self.current_path[planning_start_idx]['d2']
 
-    path = propose_geometric_spline_path(self.current_position, next_gate, next_next_gate)
+      # if the start position is too close to the next gate, or it is already passed the next gate,
+      # then we will use later gates for raw waypoint
+      # in case the planning has hit the last gate, an artificial raw waypoint that is after the last
+      # gate is used.
+      skip_next_gate = False
+      if np.linalg.norm(next_gate - wp0) <= 1 or np.linalg.norm(next_gate - wp1) <= 1:
+        rospy.loginfo("Too close to next gate: {}. Will head for more future gates for waypoints.".format(self.target_gate_idx))
+        skip_next_gate = True
+      elif self.is_cross_gate(self.target_gate_idx, wp0, wp1):
+        rospy.loginfo("About to pass next gate: {}. Will head for more future gates for waypoints.".format(self.target_gate_idx))
+        skip_next_gate = True
+      
+      if skip_next_gate:
+        if len(self.gates_sequence) <= 1:
+          wp2 = None
+        else:
+          wp2 = self.get_waypoint_for_next_n_gate(2)
+      else:
+        wp2 = next_gate
+    else:
+      rospy.loginfo("Planning for the first time")
+      wp1 = next_gate
+      wp2 = self.get_waypoint_for_next_n_gate(2)
+
+    self.publish_raw_waypoints_viz(wp0, wp1, wp2)
+    path = propose_geometric_spline_path((wp0, wp1, wp2), d1, d2)
     trajectory_points = sample_path(path)
-    return self.generate_velocity_profile(trajectory_points)
-  
+    path = self.generate_velocity_profile(trajectory_points)
+    self.current_path = path
+    return path
+
+  def search_for_nearest_waypoint(self, position):
+    num_points = len(self.current_path)
+    for i in range(num_points - 1, -1, -1):
+        prev_pt = self.current_path[i - 1]["point"]
+        next_pt = self.current_path[i]["point"]
+        vec_ref = np.array(next_pt) - np.array(prev_pt)
+        vec = np.array(next_pt) - np.array(position)
+        if np.dot(vec, vec_ref) <= 0:
+          return i
+    return 0
+
+  def get_waypoint_for_next_n_gate(self, n=1):
+    if n == 1:
+      return self.gate_locations[self.target_gate_idx]['center']
+    if n > len(self.gates_sequence):
+      if len(self.gates_sequence) <= 1:
+        # no gates or only one gate left. get waypoint 5 meters along the direction from the current position to the target gate
+        target_gate_loc = self.gate_locations[self.target_gate_idx]['center']
+        direction = target_gate_loc - self.current_position
+        direction /= np.linalg.norm(direction)
+      else:
+        # in this case, direction is defined as the last but 1 gate towards the last gate.
+        target_gate_loc = self.gate_locations[self.gates_sequence[n - 1]]['center']
+        direction = target_gate_loc - self.gate_locations[self.gates_sequence[n - 2]]['center']
+        direction /= np.linalg.norm(direction)
+      return target_gate_loc + 5 * direction
+    else:
+      return self.gate_locations[self.gates_sequence[n - 2]]['center']
+
   def generate_velocity_profile(self, points):
     trajectory_points = self.calculate_points_with_geometric_information(points)
 
@@ -103,7 +181,8 @@ class SplinePlannerNew(object):
 
       accel = (trajectory_points[i + 1]['velocity'] - trajectory_points[i]['velocity']) / (current_time - prev_time)
       trajectory_points[i]['acceleration'] = accel
-    trajectory_points[-1]['acceleration'] = trajectory_points[-2]['acceleration']
+    if len(trajectory_points) > 1:
+      trajectory_points[-1]['acceleration'] = trajectory_points[-2]['acceleration']
     return trajectory_points
 
 
@@ -183,6 +262,7 @@ class SplinePlannerNew(object):
     raw_waypoints_marker.action = Marker.ADD
     raw_waypoints_marker.id = 1
     for wp in waypoints:
+      if wp is not None:
         raw_waypoints_marker.points.append(Point(wp[0], wp[1], wp[2]))
     self.raw_waypoints_viz_pub.publish(raw_waypoints_marker)
 
@@ -194,7 +274,7 @@ class SplinePlannerNew(object):
       point = trajectory[idx]
       point['time'] = trajectory[idx]['time']
       transform = Transform()
-      transform.translation = Point(*(point['point'].tolist()))
+      transform.translation = Vector3(*(point['point'].tolist()))
       transform.rotation = Quaternion(*(vec_to_quat(point['velocity']).tolist()))
       velocity = Twist()
       velocity.linear = Vector3(*(point['velocity'].tolist()))
@@ -210,10 +290,11 @@ class SplinePlannerNew(object):
     if len(self.gates_sequence) == 0:
       rospy.loginfo("No next targeting gate.")
       self.target_gate_idx = None
-      return
+      return False
     self.target_gate_idx = self.gates_sequence[0]
     del self.gates_sequence[0]
     rospy.loginfo("Next gate: {}".format(self.target_gate_idx))
+    return True
 
   def is_cross_gate(self, gate_index, position_before, position_after):
     """Check if the drone has passed the target gate.
@@ -236,15 +317,28 @@ class SplinePlannerNew(object):
 
   def odometry_callback(self, odometry):
     # type: (Odometry) -> None
+    prev_time = self.current_time
+    self.current_time = odometry.header.stamp.to_sec()
+
     self.last_position = self.current_position
     self.current_position = point_to_ndarray(odometry.pose.pose.position)
+
+    prev_velocity = self.current_velocity
     self.current_velocity = vector3_to_ndarray(odometry.twist.twist.linear)
+
+    if prev_velocity is not None and prev_time is not None:
+      self.current_acceleration = (self.current_velocity - prev_velocity) / (self.current_time - prev_time)
+
     if self.last_position is None or self.target_gate_idx is None:
       return
     # check if the drone has passed the target gate
     if self.is_cross_gate(self.target_gate_idx, self.last_position, self.current_position):
       rospy.loginfo("Drone has passed gate {}".format(self.target_gate_idx))
-      self.head_for_next_gate()
+      if self.head_for_next_gate():
+        rospy.loginfo("Heading for gate {}".format(self.target_gate_idx))
+      else:
+        rospy.loginfo("All gates have been visited. Stop planning.")
+        self.stop_planning = True
 
   def reconfigure_parameteres(self, config, level):
     rospy.loginfo("""Parameters reconfiguration requested:
@@ -288,7 +382,7 @@ max_total_acceleration: {max_total_acceleration}""".format(**config))
     self.raw_waypoints_viz_pub = rospy.Publisher("~raw_waypoints_viz", Marker, queue_size=1, latch=True)
     rospy.loginfo("Planner node ready.")
     self.head_for_next_gate()
-    rate = rospy.Rate(1)
+    rate = rospy.Rate(2)
     while not rospy.is_shutdown():
       if not self.stop_planning:
         if self.current_position is not None and self.target_gate_idx is not None:
