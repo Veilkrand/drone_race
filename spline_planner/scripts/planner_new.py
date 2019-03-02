@@ -71,53 +71,22 @@ class SplinePlannerNew(object):
     #
     # in case that we don't have a next next gate, a waypoint that is 5 meter away from the last gate
     # along the trajectory direction is used instead
-    look_ahead_time = 2
     next_gate = self.get_waypoint_for_next_n_gate()
     wp0 = self.current_position
     d1 = {}
     d2 = {}
-    #wp1 = self.get_waypoint_for_next_n_gate(1)
-    #wp2 = self.get_waypoint_for_next_n_gate(2)
-    #if np.linalg.norm(wp1 - wp0) < 0.5:
-    #  wp1 = self.get_waypoint_for_next_n_gate(2)
-    #  wp2 = self.get_waypoint_for_next_n_gate(3)
     if self.current_path is not None:
-      # find the nearest waypoint, and look ahead from that position. use that as the
-      # start position of replanning.
-      rospy.loginfo("Re-planning")
-      nearest_waypoint_idx = self.search_for_nearest_waypoint(self.current_position)
-      nearest_waypoint_time = self.current_path[nearest_waypoint_idx]['time']
-
-      planning_start_idx = nearest_waypoint_idx
-      current_path_length = len(self.current_path)
-      while planning_start_idx < current_path_length - 1:
-        point = self.current_path[planning_start_idx]
-        if point['time'] - nearest_waypoint_time >= look_ahead_time:
-          break
-        planning_start_idx += 1
-      wp1 = self.current_path[planning_start_idx]['point']
-      d1[1] = self.current_path[planning_start_idx]['d1']
-      d2[1] = self.current_path[planning_start_idx]['d2']
-
-      # if the start position is too close to the next gate, or it is already passed the next gate,
-      # then we will use later gates for raw waypoint
-      # in case the planning has hit the last gate, an artificial raw waypoint that is after the last
-      # gate is used.
       skip_next_gate = False
-      if np.linalg.norm(next_gate - wp0) <= 1 or np.linalg.norm(next_gate - wp1) <= 1:
+      if np.linalg.norm(next_gate - wp0) <= 0.5:
         rospy.loginfo("Too close to next gate: {}. Will head for more future gates for waypoints.".format(self.target_gate_idx))
-        skip_next_gate = True
-      elif self.is_cross_gate(self.target_gate_idx, wp0, wp1):
-        rospy.loginfo("About to pass next gate: {}. Will head for more future gates for waypoints.".format(self.target_gate_idx))
         skip_next_gate = True
       
       if skip_next_gate:
-        if len(self.gates_sequence) <= 1:
-          wp2 = None
-        else:
-          wp2 = self.get_waypoint_for_next_n_gate(2)
+        wp1 = self.get_waypoint_for_next_n_gate(2)
+        wp2 = self.get_waypoint_for_next_n_gate(3)
       else:
-        wp2 = next_gate
+        wp1 = next_gate
+        wp2 = self.get_waypoint_for_next_n_gate(2)
     else:
       rospy.loginfo("Planning for the first time")
       wp1 = next_gate
@@ -144,7 +113,7 @@ class SplinePlannerNew(object):
   def get_waypoint_for_next_n_gate(self, n=1):
     if n == 1:
       return self.gate_locations[self.target_gate_idx]['center']
-    if n > len(self.gates_sequence):
+    if n - 1 > len(self.gates_sequence):
       if len(self.gates_sequence) <= 1:
         # no gates or only one gate left. get waypoint 5 meters along the direction from the current position to the target gate
         target_gate_loc = self.gate_locations[self.target_gate_idx]['center']
@@ -152,8 +121,8 @@ class SplinePlannerNew(object):
         direction /= np.linalg.norm(direction)
       else:
         # in this case, direction is defined as the last but 1 gate towards the last gate.
-        target_gate_loc = self.gate_locations[self.gates_sequence[n - 1]]['center']
-        direction = target_gate_loc - self.gate_locations[self.gates_sequence[n - 2]]['center']
+        target_gate_loc = self.gate_locations[self.gates_sequence[-1]]['center']
+        direction = target_gate_loc - self.gate_locations[self.gates_sequence[-2]]['center']
         direction /= np.linalg.norm(direction)
       return target_gate_loc + 5 * direction
     else:

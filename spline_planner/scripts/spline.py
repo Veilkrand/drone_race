@@ -88,15 +88,19 @@ def propose_geometric_spline_path(waypoints, derivatives_1=None, derivatives_2=N
         norm_12 = np.linalg.norm(direct12)
         norm_23 = np.linalg.norm(direct23)
 
-        axis = np.cross(direct12, direct23)
-        axis /= np.linalg.norm(axis)
-        angle = np.arccos(np.dot(direct12, direct23) / (norm_12 * norm_23)) / 2
-
-        t2 = direct12 / norm_12
-        # by Rodrigues' rotation formula
-        t2 = np.cos(angle) * t2 + np.sin(angle) * np.cross(axis, t2) + (1 - np.cos(angle)) * np.dot(axis, t2) * axis
-        t2 *= (0.5 * (min(norm_12, norm_23)))
-        full_d1.append(t2)
+        if norm_12 < 1e-5 or norm_23 < 1e-5:
+          t2 = np.array([0, 0, 0], dtype=np.float)
+        else:
+          axis = np.cross(direct12, direct23)
+          axis /= np.linalg.norm(axis)
+          cos_theta = np.dot(direct12, direct23) / (norm_12 * norm_23)
+          cos_theta = min(1, max(-1, cos_theta))
+          angle = np.arccos(cos_theta) / 2
+          t2 = direct12 / norm_12
+          # by Rodrigues' rotation formula
+          t2 = np.cos(angle) * t2 + np.sin(angle) * np.cross(axis, t2) + (1 - np.cos(angle)) * np.dot(axis, t2) * axis
+          t2 *= (0.5 * (min(norm_12, norm_23)))
+          full_d1.append(t2)
 
   for i in range(num_waypoints):
     if derivatives_2 is not None and derivatives_2.has_key(i):

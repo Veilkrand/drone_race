@@ -120,17 +120,17 @@ namespace cascaded_pid_control {
 
   void CascadedPidControl::OdometryCallback(const nav_msgs::OdometryConstPtr &ptr) {
     if (controller_active_) {
-      mav_msgs::EigenOdometry current;
-      mav_msgs::eigenOdometryFromMsg(*ptr, &current);
+      mav_msgs::eigenOdometryFromMsg(*ptr, &last_odometry_);
       double current_time = ptr->header.stamp.toSec();
       double dt = current_time - last_odometry_time_;
+      last_odometry_time_ = current_time;
 
       Eigen::Vector3d accel_ff = set_point_.acceleration_W + default_ff_;
 
-      double thrust = AltitudeControl(current, set_point_, accel_ff, dt);
-      Eigen::Vector3d accel_cmd = LateralPositionControl(current, set_point_, accel_ff, dt);
-      Eigen::Vector3d pqr_rate_cmd = AttitudeControl(current, accel_cmd, thrust, dt);
-      pqr_rate_cmd[2] = YawControl(current, set_point_.getYaw(), dt);
+      double thrust = AltitudeControl(last_odometry_, set_point_, accel_ff, dt);
+      Eigen::Vector3d accel_cmd = LateralPositionControl(last_odometry_, set_point_, accel_ff, dt);
+      Eigen::Vector3d pqr_rate_cmd = AttitudeControl(last_odometry_, accel_cmd, thrust, dt);
+      pqr_rate_cmd[2] = YawControl(last_odometry_, set_point_.getYaw(), dt);
 
       // ROS_INFO_STREAM(thrust<<" "<<accel_cmd<<" "<<pqr_rate_cmd);
 
@@ -142,11 +142,10 @@ namespace cascaded_pid_control {
       mav_msgs::vectorEigenToMsg(pqr_rate_cmd, &rate_thrust.angular_rates);
 
       if (publish_debug_topic_) {
-        PublishDebugTopic(current);
+        PublishDebugTopic(last_odometry_);
       }
 
       rate_thrust_pub_.publish(rate_thrust);
-      last_odometry_time_ = current_time;
     }
   }
 
@@ -162,7 +161,7 @@ namespace cascaded_pid_control {
 
     rate_thrust_pub_ = private_nh_.advertise<mav_msgs::RateThrust>("rateThrust", 1);
     odometry_sub_ = private_nh_.subscribe<nav_msgs::Odometry>("odometry", 1, &CascadedPidControl::OdometryCallback, this);
-    trajectory_sub_ = private_nh_.subscribe<trajectory_msgs::MultiDOFJointTrajectory>("trajectory", 1, &CascadedPidControl::TrajectoryCallbackNew, this);
+    trajectory_sub_ = private_nh_.subscribe<trajectory_msgs::MultiDOFJointTrajectory>("trajectory", 1, &CascadedPidControl::TrajectoryCallbackStartFromNearest, this);
 
     if (publish_debug_topic_) {
       position_setpoint_pub_ = private_nh_.advertise<geometry_msgs::Vector3>("positionSetpoint", 8);
@@ -253,6 +252,74 @@ namespace cascaded_pid_control {
     position_error_pub_.publish(pos_error);
     velocity_error_pub_.publish(vel_error);
     attitude_error_pub_.publish(att_error);
+  }
+
+  void CascadedPidControl::TrajectoryCallbackStartFromNearest(const trajectory_msgs::MultiDOFJointTrajectoryConstPtr& ptr) {
+    // This trajectory handler when receiving a new trajectory, pickup the neartest waypoint to the current position and
+    // use it as the next target set point
+    if (ptr->points.size() == 0) {
+      ROS_WARN("Empty trajectory.");
+      return;
+    }
+
+    ROS_INFO("New trajectory arrived.");
+
+    timer_.stop();
+    traj_points_.clear();
+    command_wait_time_.clear();
+
+    double nearest_dist;
+    auto iter = ptr->points.begin();
+    double last_time = iter->time_from_start.toSec();
+    command_wait_time_.push_back(last_time);
+    mav_msgs::EigenTrajectoryPoint eigen_traj_point;
+    mav_msgs::eigenTrajectoryPointFromMsg(*iter, &eigen_traj_point);
+    traj_points_.push_back(eigen_traj_point);
+
+    bool nearest_found = false;
+    double threshold_dist = (last_odometry_.position_W - eigen_traj_point.position_W).norm();
+    nearest_dist = threshold_dist;
+    int nearest_idx = 0;
+
+    for (++iter; iter != ptr->points.end(); ++iter) {
+      double traj_time = iter->time_from_start.toSec();
+      command_wait_time_.push_back(traj_time - last_time);
+      mav_msgs::eigenTrajectoryPointFromMsg(*iter, &eigen_traj_point);
+      traj_points_.push_back(eigen_traj_point);
+
+      if (!nearest_found) {
+        double dist = (last_odometry_.position_W - eigen_traj_point.position_W).norm();
+        if (dist > threshold_dist) {
+          nearest_found = true;
+        } else {
+          if (dist < nearest_dist) {
+            nearest_dist = dist;
+            nearest_idx = iter - ptr->points.begin();
+          }
+        }
+      }
+
+      last_time = traj_time;
+    }
+
+    ROS_INFO("The closest trajectory point to the current position is at index %d.", nearest_idx);
+
+    while (nearest_idx-- >= 0) {
+      traj_points_.pop_front();
+      command_wait_time_.pop_front();
+    }
+
+    SetNextPoint(traj_points_.front());
+    traj_points_.pop_front();
+
+    if (!traj_points_.empty()) {
+      double wait_time = command_wait_time_.front();
+      command_wait_time_.pop_front();
+      timer_.setPeriod(ros::Duration(wait_time));
+      timer_.start();
+    }
+
+    controller_active_ = true;    
   }
 
   void CascadedPidControl::TrajectoryCallbackNew(const trajectory_msgs::MultiDOFJointTrajectoryConstPtr& ptr) {

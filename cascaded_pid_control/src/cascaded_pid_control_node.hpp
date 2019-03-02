@@ -82,7 +82,8 @@ namespace cascaded_pid_control {
 
     void OdometryCallback(const nav_msgs::OdometryConstPtr &ptr);
     void TrajectoryCallback(const trajectory_msgs::MultiDOFJointTrajectoryConstPtr& ptr);
-    void TrajectoryCallbackNew(const trajectory_msgs::MultiDOFJointTrajectoryConstPtr& ptr);    
+    void TrajectoryCallbackNew(const trajectory_msgs::MultiDOFJointTrajectoryConstPtr& ptr);
+    void TrajectoryCallbackStartFromNearest(const trajectory_msgs::MultiDOFJointTrajectoryConstPtr& ptr);    
 
     void TimerCallback(const ros::TimerEvent& e);
 
@@ -108,6 +109,7 @@ namespace cascaded_pid_control {
     double kp_yaw_;
 
     // other member variables
+    mav_msgs::EigenOdometry last_odometry_;
     double last_odometry_time_;
     dynamic_reconfigure::Server<CascadedPidConfig> server_;
     ros::Publisher rate_thrust_pub_;
