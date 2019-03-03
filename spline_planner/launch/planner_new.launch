@@ -1,17 +1,20 @@
 <launch>
 
   <arg name="rviz" default="0" />
-  <arg name="course" default="'1'" />
+  <arg name="load_test_course" default="0" />
+
+  <group ns="/uav" if="$(arg load_test_course)">
+      <rosparam command="load" file="$(find spline_planner)/config/test_course.yaml"/>
+  </group>
+
+  
+  <!-- Gate pose publisher node (cheat gate pose node) -->
+  <node pkg="cascaded_pid_control" type="cheat_gate_locations_node.py" name="gt_gates_publisher" output="screen" />
 
   <!-- Planner node -->
   <node pkg="spline_planner" type="planner_new.py" name="spline_planner" output="screen">
     <remap from="/spline_planner/odometry" to="/CheatOdometryNode/odometry"/>
     <remap from="/spline_planner/trajectory" to="/CascadedPidControl/trajectory" />
-  </node>
-
-  <!-- Gate pose publisher node (cheat gate pose node) -->
-  <node pkg="cascaded_pid_control" type="cheat_gate_locations_node.py" name="gt_gates_publisher" output="screen">
-    <param name="~course" value="$(arg course)"/>
   </node>
 
   <!-- ego trajectory publisher -->

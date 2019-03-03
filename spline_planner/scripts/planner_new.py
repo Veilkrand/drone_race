@@ -12,7 +12,6 @@ from collections import deque
 import tf
 import numpy as np
 
-import ros_geometry as geo
 from spline import *
 
 
@@ -342,10 +341,24 @@ max_total_acceleration: {max_total_acceleration}""".format(**config))
         "gate_proj_xy": gate_proj_xy / np.linalg.norm(gate_proj_xy)
       })
 
+  def load_course_gates(self):
+    """Load gate sequence of course from parameter /uav/gate_names
+    """
+    gates = rospy.get_param("/uav/gate_names", None)
+    
+    if gates is None:
+      rospy.logwarn("Unable to load course definition from /uav/gate_names")
+      self.gates_sequence = []
+      return
+
+    self.gates_sequence = list(int(g.replace("Gate", ""), 10) for g in gates)
+    rospy.loginfo("Course loaded. Gate sequence: {}".format(self.gates_sequence))
+
   def start(self, name="SplinePlannerNew"):
     rospy.init_node(name)
     self.srv = Server(PlannerConfig, self.reconfigure_parameteres)
     self.load_nominal_gates_locations()
+    self.load_course_gates()
     self.odometry_sub = rospy.Subscriber("~odometry", Odometry, self.odometry_callback)
     self.traj_pub = rospy.Publisher("~trajectory", MultiDOFJointTrajectory, queue_size=1, latch=True)
     self.raw_waypoints_viz_pub = rospy.Publisher("~raw_waypoints_viz", Marker, queue_size=1, latch=True)

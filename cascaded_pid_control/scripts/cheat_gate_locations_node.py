@@ -147,17 +147,25 @@ if __name__ == '__main__' :
     for k in all_gates.keys():
       value = all_gates[k]
       loc = np.array(value['location'])
+      norms = [np.linalg.norm(loc[1] - loc[0]),
+               np.linalg.norm(loc[2] - loc[0]),
+               np.linalg.norm(loc[3] - loc[0])]
       # a simple strategy for determining center of the gate is,
       # use the center of the gate corner
-      center = (loc[0] + loc[2]) / 2
+      idx = np.argmax(norms)
+      center = (loc[idx + 1] + loc[0]) / 2
       # orientation of the gate is deteremined by the course
       # connect consecutive all_gates. the resulting vector is then can be 
       # used as "un-normalized" orientation.
       gate_locations[k] = {'corners': loc, 'center': center, 'orientation': np.cross(loc[1] - loc[0], loc[3] - loc[0])}
 
-  course_def = str(rospy.get_param("~course", "1"))
+  gates = rospy.get_param("/uav/gate_names", None)
+  if gates is None:
+    rospy.logwarn("Unable to load course definition from /uav/gate_names")
+    exit(-1)
 
-  course = list([int(i) for i in course_def.split(" ")])
+  course = list(int(g.replace("Gate", ""), 10) for g in gates)
+  rospy.set_param("/uav/gate_names", list("Gate{}".format(c) for c in course))
   print("Course gate sequence: {}".format(course))
 
   course_gates = []

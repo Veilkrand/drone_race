@@ -277,9 +277,15 @@ namespace cascaded_pid_control {
     traj_points_.push_back(eigen_traj_point);
 
     bool nearest_found = false;
-    double threshold_dist = (last_odometry_.position_W - eigen_traj_point.position_W).norm();
-    nearest_dist = threshold_dist;
+    double threshold_dist;
     int nearest_idx = 0;
+
+    if (last_odometry_time_ <= 0) {
+      nearest_found = true;
+    } else {
+      threshold_dist = (last_odometry_.position_W - eigen_traj_point.position_W).norm();
+      nearest_dist = threshold_dist;
+    }
 
     for (++iter; iter != ptr->points.end(); ++iter) {
       double traj_time = iter->time_from_start.toSec();
@@ -304,7 +310,7 @@ namespace cascaded_pid_control {
 
     ROS_INFO("The closest trajectory point to the current position is at index %d.", nearest_idx);
 
-    while (nearest_idx-- >= 0) {
+    while (traj_points_.size() > 1 && nearest_idx-- >= 0) {
       traj_points_.pop_front();
       command_wait_time_.pop_front();
     }
