@@ -46,6 +46,39 @@ namespace simple_vo {
     out.y = (y - cy) / fy;
   }
 
+  Eigen::VectorXd SimpleVo::EstimateDepthOfGate(std::size_t gate_idx, std::vector<cv::Point2d> corners_2d) {
+    cv::Mat rvec;
+    cv::Mat tvec;
+    cv::solvePnP(gate_corners_rel_[gate_idx], corners_2d, k_, cv::Mat(), rvec, tvec);
+    // rvec/tvec contains transformation from object coordinate to
+    // camera coordinate. because the way gate_corners_rel_ are arranged,
+    // the can be consider as "gate local coordinate" with the first 
+    // corner of each gate as the origin.
+    //
+    // so rvec/tvec can give us information about the distance from
+    // the camera principal point to the first corner of the gate,
+    // then we can know the distance to other corners to.
+    //
+    // with this information, we can estimate depth information of
+    // each corner of the gate.
+    cv::Mat r;
+    cv::Rodrigues(rvec, r);
+
+    Eigen::VectorXd result(4);
+    for (std::size_t i = 0; i < 4; ++i) {
+      ROS_INFO_STREAM(cv::norm(gate_corners_rel_[gate_idx][i] - gate_corners_rel_[gate_idx][0]));
+      cv::Mat pt = (cv::Mat_<double>(3, 1)<<gate_corners_rel_[gate_idx][i].x,
+		    gate_corners_rel_[gate_idx][i].y,
+		    gate_corners_rel_[gate_idx][i].z);
+      double d = cv::norm(r * pt + tvec);
+      Eigen::Vector3d cam_h;
+      BackProject(corners_2d[i].x, corners_2d[i].y, 1.0, cam_h);
+      result[i] = d / cam_h.norm();
+    }
+
+    return result;
+  }
+
   void SimpleVo::IRMarkerArrayCallback(const flightgoggles::IRMarkerArrayConstPtr& ptr) {
     if (!initialized_) {
       char buf[64];
@@ -57,33 +90,44 @@ namespace simple_vo {
       // p_ref_->t_c_w = Sophus::SE3d(initial_orientation_.inverse(), -initial_position_);
       p_ref_->t_c_w = Sophus::SE3d();
 
-      bool scale_determined = false;
+      std::vector<cv::Point2d> ref_gate_corners(4);
       auto iter = ptr->markers.begin();
       while (iter != ptr->markers.end()) {
         if (iter->landmarkID.data == target_gate) {
           std::size_t idx = std::atoi(iter->markerID.data.c_str());
-          double depth_init = (gate_corners_[reference_gate_idx_][idx - 1] - initial_position_).norm();
-          Eigen::Vector3d pt_3d;
-          BackProject(iter->x, iter->y, depth_init, pt_3d);
-
-	  if (!scale_determined) {
-	    scale_ = depth_init;
-	    scale_determined = true;
-	  }
+	  ref_gate_corners[idx-1].x = iter->x;
+	  ref_gate_corners[idx-1].y = iter->y;
 
 	  StoreLandmark(p_ref_->landmarks_2d, reference_gate_idx_, idx, Eigen::Vector2d(iter->x, iter->y));
-	  StoreLandmark(p_ref_->landmarks_3d, reference_gate_idx_, idx, pt_3d);
-	  ROS_INFO_STREAM("Landmark coord "<<pt_3d);
         }
         ++iter;
       }
-      ROS_INFO("Scale: %.2f", scale_);
 
+      const Eigen::VectorXd depth = EstimateDepthOfGate(reference_gate_idx_,
+							ref_gate_corners);
+      ROS_INFO_STREAM("Depth:"<<depth);
+
+      for (std::size_t i = 1; i <= 4; ++i) {
+	Eigen::Vector3d pt_3d;
+	const Eigen::Vector2d& pt_2d = GetLandmark(p_ref_->landmarks_2d, reference_gate_idx_, i);
+	
+	BackProject(pt_2d[0], pt_2d[1], depth[i-1], pt_3d);
+
+	ROS_INFO_STREAM("Gate corner "<<i<<" coordinate in camera frame:"<<pt_3d);
+	
+	if (i > 1) {
+	  ROS_INFO_STREAM((pt_3d - GetLandmark(p_ref_->landmarks_3d, reference_gate_idx_, 1)).norm());
+	}
+	StoreLandmark(p_ref_->landmarks_3d, reference_gate_idx_, i, pt_3d);
+      }
+      
       initialized_ = true;
 
       ROS_INFO("Initialized");
       return;
     }
+
+    return;
 
     auto p_curr = std::make_shared<Frame>();
     p_curr->timestamp = ptr->header.stamp.toSec();
@@ -244,11 +288,21 @@ namespace simple_vo {
       XmlRpc::XmlRpcValue corners;
       nh_.getParam(buf, corners);
       std::vector<Eigen::Vector3d> cs;
+      std::vector<cv::Point3d> cs_rel;
       for (std::size_t j = 0; j < 4; ++j) {
         cs.push_back(Eigen::Vector3d(corners[j][0], corners[j][1], corners[j][2]));
+	if (j == 0) {
+	  // 0, 0, 0 for the first corner
+	  cs_rel.push_back(cv::Point3d(0, 0, 0));
+	} else {
+	  // position relative to the first corner for the others
+	  const Eigen::Vector3d v = cs[j] - cs[0];
+	  cs_rel.push_back(cv::Point3d(v[0], v[1], v[2]));
+	}
       }
 
       gate_corners_.push_back(cs);
+      gate_corners_rel_.push_back(cs_rel);
     }
     ROS_INFO("Nominal gates information loaded.");
   }

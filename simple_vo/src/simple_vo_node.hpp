@@ -32,7 +32,9 @@ namespace simple_vo {
 
     void BackProject(double x, double y, double depth, Eigen::Vector3d& out);
     void Pixel2Camera(double x, double y, Eigen::Vector2d& out);
-    void Pixel2Camera(double x, double y, cv::Point2d& out);    
+    void Pixel2Camera(double x, double y, cv::Point2d& out);
+
+    Eigen::VectorXd EstimateDepthOfGate(std::size_t gate_idx, std::vector<cv::Point2d> corners_2d);
 
     double scale_;
     bool initialized_;
@@ -41,6 +43,10 @@ namespace simple_vo {
     
     // storing the (nominal) position of the gates (corners)
     std::vector<std::vector<Eigen::Vector3d>> gate_corners_;
+
+    // storing gates coordinates w.r.t. the first corner of each gate.
+    // used in estimating depth information of gate
+    std::vector<std::vector<cv::Point3d>> gate_corners_rel_;
     
     // FIXME: don't hard-coded the nearest gate here.
     std::size_t reference_gate_idx_ = 10;
