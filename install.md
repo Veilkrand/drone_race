@@ -63,7 +63,7 @@ git clone git@github.com:ethz-asl/ethzasl_msf.git
 git clone git@github.com:ethz-asl/glog_catkin.git
 git clone git@github.com:catkin/catkin_simple.git
 sudo pip install scipy
-sudo apt-get install ros-kinetic-sophus
+sudo apt-get install ros-kinetic-sophus ros-kinetic-robot-localization
 ```
 
 Deactivate some dependencies that are only needed on a real drone and which would otherwise
@@ -119,6 +119,7 @@ source devel/setup.bash
 roslaunch flightgoggles core.launch use_external_renderer:=1 ignore_collisions:=1
 rosrun flightgoggles FlightGoggles.x86_64
 roslaunch cascaded_pid_control cascaded_pid_control_gt.launch
+roslaunch odometry odometry.launch
 roslaunch spline_planner planner_new.launch load_test_course:=1
 ```
 
