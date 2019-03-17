@@ -6,6 +6,7 @@ that location to /odometry/filtered.
 ```sh
 roslaunch odometry odometry.launch
 rostopic echo /odometry/filtered
+roslaunch odometry diagnostic.launch
 ```
 
 # Strategy
