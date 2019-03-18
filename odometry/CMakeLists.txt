@@ -5,6 +5,7 @@ find_package(catkin REQUIRED COMPONENTS
   rospy
   std_msgs
   geometry_msgs
+  robot_localization
   dynamic_reconfigure)
 
 catkin_package()

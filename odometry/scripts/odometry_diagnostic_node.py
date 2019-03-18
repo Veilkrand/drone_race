@@ -74,12 +74,12 @@ class OdometryDiagnosticNode(object):
   def odometry_to_rpy(self, odometry):
     orientation_quat = odometry.pose.pose.orientation
     orientation_list = [orientation_quat.x, orientation_quat.y, orientation_quat.z, orientation_quat.w]
-    (roll, pitch, yaw) = euler_from_quaternion (orientation_list)
+    (roll, pitch, yaw) = euler_from_quaternion(orientation_list)
     return {'roll': roll, 'pitch': pitch, 'yaw': yaw}
 
 if __name__ == '__main__':
   rospy.loginfo("Starting the odometry diagnostic node")
-  rospy.init_node("odometry_diagnostic_node", anonymous=True)
+  rospy.init_node("odometry_diagnostic", anonymous=True)
   node = OdometryDiagnosticNode()
   node.start()
 
