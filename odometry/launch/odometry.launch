@@ -1,0 +1,8 @@
+<launch>
+  <node pkg="robot_localization" type="ekf_localization_node" name="ekf_se" clear_params="true">
+    <rosparam command="load" file="$(find odometry)/config/robot_localization.yaml" />
+  </node>
+
+  <node pkg="odometry" type="odometry_start_node.py" name="odometry_start" output="screen" />
+</launch>
+
