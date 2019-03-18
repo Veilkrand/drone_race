@@ -34,6 +34,12 @@ namespace simple_vo {
     void Pixel2Camera(double x, double y, Eigen::Vector2d& out);
     void Pixel2Camera(double x, double y, cv::Point2d& out);
 
+    void UpdateEstimatedPositionsOfGates(std::shared_ptr<Frame> frame);
+    void UpdateEstimatedPositionOfSingleGate(std::shared_ptr<Frame> frame,
+				      const std::vector<cv::Point2d>& pts_2d,
+				      const std::vector<cv::Point3d>& pts_3d,
+				      const std::vector<std::size_t>& keys);
+
     Eigen::VectorXd EstimateDepthOfGate(std::size_t gate_idx, std::vector<cv::Point2d> corners_2d);
 
     double scale_;
@@ -47,7 +53,7 @@ namespace simple_vo {
     // storing gates coordinates w.r.t. the first corner of each gate.
     // used in estimating depth information of gate
     std::vector<std::vector<cv::Point3d>> gate_corners_rel_;
-    
+
     // FIXME: don't hard-coded the nearest gate here.
     std::size_t reference_gate_idx_ = 10;
     Eigen::Vector3d initial_position_;
@@ -60,6 +66,8 @@ namespace simple_vo {
 
     ros::Subscriber camera_info_sub_;
     ros::Subscriber ir_beacons_sub_;
+
+    ros::Publisher corners_viz_pub_;
   };
   
 }

@@ -15,6 +15,14 @@ namespace simple_vo {
   inline std::size_t GetLandmarkKey(std::size_t gate_idx, std::size_t corner_idx) {
     return 100000 + gate_idx * 100 + corner_idx;
   }
+
+  inline std::size_t GetGateIndex(std::size_t key) {
+    return (key - 100000) / 100;
+  }
+
+  inline std::size_t GetCornerIndex(std::size_t key) {
+    return key % 100;
+  }
   
   template <typename T>
   inline void StoreLandmark(std::map<std::size_t, T>& map, std::size_t key, const T& position) {
