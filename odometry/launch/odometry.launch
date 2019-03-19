@@ -1,8 +1,15 @@
 <launch>
-  <node pkg="robot_localization" type="ekf_localization_node" name="ekf_se" clear_params="true">
+  <node pkg="robot_localization" type="ekf_localization_node" name="ekf_odom" clear_params="true">
     <rosparam command="load" file="$(find odometry)/config/robot_localization.yaml" />
+    <param name="world_frame" value="odom"/>
+  </node>
+  <node pkg="robot_localization" type="ekf_localization_node" name="ekf_map" clear_params="true">
+    <rosparam command="load" file="$(find odometry)/config/robot_localization.yaml" />
+    <param name="world_frame" value="map"/>
   </node>
 
   <node pkg="odometry" type="odometry_start_node.py" name="odometry_start" output="screen" />
+  <node pkg="odometry" type="odometry_altimeter_node.py" name="odometry_altimeter" output="screen" />
+  <node pkg="odometry" type="odometry_split_node.py" name="odometry_split" output="screen" />
 </launch>
 

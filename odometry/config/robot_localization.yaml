@@ -4,19 +4,19 @@ print_diagnostics: true
 map_frame: map
 odom_frame: odom
 base_link_frame: base_link
-world_frame: odom
 
-# Initial pose - switched to different approach for initial pose, using SetPose service
-#odom0: odometry/init_pose
-# Which components should be used?
-#odom0_config: [true,  true,  true,  # xyz
-#               true,  true,  true,  # rpy
-#               false, false, false, # v/xyz
-#               false, false, false, # v/rpy
-#               false, false, false] # a/xyz
-#odom0_differential: false
-#odom0_queue_size: 0
-#odom0_nodelay: true
+# Altitude based on laser rangefinder
+pose0: odometry/altitude
+pose0_config: [true,  true,  true,  # xyz
+               true,  true,  true,  # rpy
+               false, false, false, # v/xyz
+               false, false, false, # v/rpy
+               false, false, false] # a/xyz
+pose0_differential: false
+pose0_relative: false
+pose0_queue_size: 1
+pose0_rejection_threshold: 100  # Note the difference in parameter name
+pose0_nodelay: true
 
 # IMU
 imu0: uav/sensors/imu

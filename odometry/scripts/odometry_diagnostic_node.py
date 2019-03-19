@@ -23,7 +23,7 @@ class OdometryDiagnosticNode(object):
 
   def start(self):
     self.odometry_actual_subscriber = rospy.Subscriber("/CheatOdometryNode/odometry", Odometry, self.odometry_actual_callback)
-    self.odometry_measured_subscriber = rospy.Subscriber("/odometry/filtered", Odometry, self.odometry_measured_callback)
+    self.odometry_measured_subscriber = rospy.Subscriber("/odometry/map", Odometry, self.odometry_measured_callback)
     rate = rospy.Rate(1)
     while not rospy.is_shutdown():
       if self.odometry_actual is not None and self.odometry_measured is not None:
