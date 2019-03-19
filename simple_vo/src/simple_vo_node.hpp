@@ -34,13 +34,13 @@ namespace simple_vo {
     void Pixel2Camera(double x, double y, Eigen::Vector2d& out);
     void Pixel2Camera(double x, double y, cv::Point2d& out);
 
-    void UpdateEstimatedPositionsOfGates(std::shared_ptr<Frame> frame);
+    void UpdateEstimatedPositionsOfGates(std::shared_ptr<Frame> frame, cv::Mat rvec=cv::Mat(), cv::Mat tvec=cv::Mat());
     void UpdateEstimatedPositionOfSingleGate(std::shared_ptr<Frame> frame,
-				      const std::vector<cv::Point2d>& pts_2d,
-				      const std::vector<cv::Point3d>& pts_3d,
-				      const std::vector<std::size_t>& keys);
-
-    Eigen::VectorXd EstimateDepthOfGate(std::size_t gate_idx, std::vector<cv::Point2d> corners_2d);
+					     const std::vector<cv::Point2d>& pts_2d,
+					     const std::vector<cv::Point3d>& pts_3d,
+					     const std::vector<std::size_t>& keys,
+					     cv::Mat rvec=cv::Mat(),
+					     cv::Mat tvec=cv::Mat());
 
     double scale_;
     bool initialized_;

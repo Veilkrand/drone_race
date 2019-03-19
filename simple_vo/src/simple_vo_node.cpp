@@ -43,7 +43,7 @@ namespace simple_vo {
     out.y = (y - cy) / fy;
   }
 
-  void SimpleVo::UpdateEstimatedPositionsOfGates(std::shared_ptr<Frame> frame) {
+  void SimpleVo::UpdateEstimatedPositionsOfGates(std::shared_ptr<Frame> frame, cv::Mat rvec, cv::Mat tvec) {
     std::vector<cv::Point2d> pts_2d;
     std::vector<cv::Point3d> pts_3d;
     std::vector<std::size_t> keys;
@@ -53,9 +53,7 @@ namespace simple_vo {
       std::size_t gate_idx = GetGateIndex(iter->first);
       std::size_t corner_idx = GetCornerIndex(iter->first);
       if (previous_gate != gate_idx) {
-        if (pts_2d.size() >= 3) {
-	        UpdateEstimatedPositionOfSingleGate(frame, pts_2d, pts_3d, keys);
-        }
+        UpdateEstimatedPositionOfSingleGate(frame, pts_2d, pts_3d, keys, rvec, tvec);
 	      previous_gate = gate_idx;
 	      pts_2d.clear();
 	      pts_3d.clear();
@@ -69,20 +67,19 @@ namespace simple_vo {
       ++iter;
     }
 
-    if (pts_2d.size() >= 3) {
-      UpdateEstimatedPositionOfSingleGate(frame, pts_2d, pts_3d, keys);
-    }
+    UpdateEstimatedPositionOfSingleGate(frame, pts_2d, pts_3d, keys, rvec, tvec);
   }
 
   void SimpleVo::UpdateEstimatedPositionOfSingleGate(std::shared_ptr<Frame> frame,
 						     const std::vector<cv::Point2d>& pts_2d,
 						     const std::vector<cv::Point3d>& pts_3d,
-						     const std::vector<std::size_t>& keys) {
-    ROS_INFO_STREAM("Keys: "<<keys[0]);
-    cv::Mat rvec;
-    cv::Mat tvec;
+						     const std::vector<std::size_t>& keys,
+						     cv::Mat rvec_movement,
+						     cv::Mat tvec_movement) {
+    if (pts_2d.size() < 3) {
+      return;
+    }
     if (pts_2d.size() == 3) {
-      ROS_INFO_STREAM("P3P");
       std::size_t gate_idx = GetGateIndex(keys[0]);
 
       cv::Mat_<double> p3d(3, 3);
@@ -90,44 +87,88 @@ namespace simple_vo {
       std::vector<cv::Mat> rvecs;
       std::vector<cv::Mat> tvecs;
 
+      int best_solution = -1;
+      double best_error = 1e9;
+      
       int num_solutions = cv::solveP3P(pts_3d, pts_2d, k_, cv::Mat(), rvecs, tvecs, cv::SOLVEPNP_AP3P);
-      ROS_INFO_STREAM("Solutions: "<<num_solutions);
+
+      std::vector<std::shared_ptr<Landmark3D>> candidates;
+
+      // in case only 3 points are visible, pose might not be unique when using solveP3P.
+      // in such case, rvec & tvec (camera movement) information will be incorporated.
+
+      // use triangulation for estimating the depth
+      // but make sure there is movement, otherwise it is by no mean for estimating depth via triangulation
+      bool tri_estimated = false;
+      cv::Point3d est;
+      if (!tvec_movement.empty() && !rvec_movement.empty()) {
+        if (cv::norm(tvec_movement) < 1e-5) {
+          ROS_INFO("Movement too small");
+        } else {
+          cv::Mat q;
+          cv::Mat r;
+          cv::Rodrigues(rvec_movement, r);
+          std::vector<cv::Point2d> ref_pts;
+          for (std::size_t k : keys) {
+            if (HasLandmark(p_ref_->landmarks_2d, k)) {
+              const auto& pt = GetLandmark(p_ref_->landmarks_2d, k);
+              ref_pts.push_back(cv::Point2d(pt[0], pt[1]));
+            }
+          }
+          if (ref_pts.size() < 3) {
+            return;
+          }
+          
+          cv::Mat proj_ref = cv::Mat::eye(3, 4, CV_64F);
+          cv::Mat proj_curr(3, 4, CV_64F);
+          proj_curr(cv::Range::all(), cv::Range(0, 3)) = r * 1.0;
+          proj_curr.col(3) = tvec_movement * 1.0;
+          cv::triangulatePoints(proj_ref, proj_curr, pts_2d, ref_pts, q);
+          q.row(0) /= q.row(3);
+          q.row(1) /= q.row(3);
+          q.row(2) /= q.row(3);
+
+          tri_estimated = true;
+        }
+      }
+      
       for (int s = 0; s < num_solutions; ++s) {
-        rvec = rvecs[s];
-        tvec = tvecs[s];
+      	cv::Mat rvec = rvecs[s];
+	      cv::Mat tvec = tvecs[s];
         cv::Mat r;
         cv::Rodrigues(rvec, r);
-        std::size_t detected = 0;
+	      cv::Point3d a;
+	      double error = 0;
+	
+	      auto p_landmarks = std::make_shared<Landmark3D>();
+	      candidates.push_back(p_landmarks);
+	
         for (std::size_t i = 0; i < pts_2d.size(); ++i) {
-          //      ROS_INFO_STREAM(cv::norm(gate_corners_rel_[gate_idx][i] - gate_corners_rel_[gate_idx][0]));
-          detected += GetCornerIndex(keys[i]);
           cv::Mat pt = (cv::Mat_<double>(3, 1) << pts_3d[i].x, pts_3d[i].y, pts_3d[i].z);
           double d = cv::norm(r * pt + tvec);
           Eigen::Vector3d cam_h;
           BackProject(pts_2d[i].x, pts_2d[i].y, 1.0, cam_h);
           double depth = d / cam_h.norm();
           cam_h *= depth;
-          ROS_INFO_STREAM("Solution "<< s << ", pt: "<<cam_h);
-          StoreLandmark(frame->landmarks_3d, keys[i], cam_h);
+
+          if (tri_estimated) {
+            EigenVector2CvPoint(cam_h, a);
+            error += cv::norm(a - est);
+          }
+          StoreLandmark(*p_landmarks, keys[i], cam_h);
         }
-        std::size_t missing = (1+2+3+4) - detected;
-        std::size_t ref = missing == 1 ? 2 : 1;
-        const cv::Point3d& shift = gate_corners_rel_[gate_idx][missing - 1] - gate_corners_rel_[gate_idx][ref - 1];
-        cv::Point3d missing_pt;
-        missing_pt.x = tvec.at<double>(0) + shift.x;
-        missing_pt.y = tvec.at<double>(1) + shift.y;
-        missing_pt.z = tvec.at<double>(2) + shift.z;
-        std::vector<cv::Point3d> all_corners(pts_3d);
-        all_corners.insert(all_corners.begin() + missing - 1, missing_pt);
-        // calculate reprojection error.
-        std::vector<cv::Point2d> reprojected;
-        cv::projectPoints(all_corners, rvec, tvec, k_, cv::Mat(), reprojected);
-        ROS_INFO_STREAM(reprojected[0]);
-        ROS_INFO_STREAM(reprojected[1]);
-        ROS_INFO_STREAM(reprojected[2]);
-        ROS_INFO_STREAM(reprojected[3]);
-      } 
-    } else {
+        if (error < best_error) {
+          best_solution = s;
+          best_error = error;
+        }
+      }
+      auto p_best = candidates[best_solution];
+      for (auto iter = p_best->begin(); iter != p_best->end(); ++iter) {
+      	StoreLandmark(frame->landmarks_3d, iter->first, GetLandmark(*p_best, iter->first));
+      }
+    } else if (pts_2d.size() == 4) {
+      cv::Mat rvec;
+      cv::Mat tvec;
       cv::solvePnP(pts_3d, pts_2d, k_, cv::Mat(), rvec, tvec);
       // rvec/tvec contains transformation from object coordinate to
       // camera coordinate. because the way gate_corners_rel_ are arranged,
@@ -143,7 +184,6 @@ namespace simple_vo {
       cv::Mat r;
       cv::Rodrigues(rvec, r);
 
-      std::vector<int> initial_guess;
       for (std::size_t i = 0; i < pts_2d.size(); ++i) {
         //      ROS_INFO_STREAM(cv::norm(gate_corners_rel_[gate_idx][i] - gate_corners_rel_[gate_idx][0]));
         cv::Mat pt = (cv::Mat_<double>(3, 1) << pts_3d[i].x, pts_3d[i].y, pts_3d[i].z);
@@ -155,39 +195,6 @@ namespace simple_vo {
         StoreLandmark(frame->landmarks_3d, keys[i], cam_h);
       }
     }
-  }
-  
-  Eigen::VectorXd SimpleVo::EstimateDepthOfGate(std::size_t gate_idx, std::vector<cv::Point2d> corners_2d) {
-    cv::Mat rvec;
-    cv::Mat tvec;
-    cv::solvePnP(gate_corners_rel_[gate_idx], corners_2d, k_, cv::Mat(), rvec, tvec);
-    // rvec/tvec contains transformation from object coordinate to
-    // camera coordinate. because the way gate_corners_rel_ are arranged,
-    // the can be consider as "gate local coordinate" with the first 
-    // corner of each gate as the origin.
-    //
-    // so rvec/tvec can give us information about the distance from
-    // the camera principal point to the first corner of the gate,
-    // then we can know the distance to other corners to.
-    //
-    // with this information, we can estimate depth information of
-    // each corner of the gate.
-    cv::Mat r;
-    cv::Rodrigues(rvec, r);
-
-    Eigen::VectorXd result(4);
-    for (std::size_t i = 0; i < 4; ++i) {
-      ROS_INFO_STREAM(cv::norm(gate_corners_rel_[gate_idx][i] - gate_corners_rel_[gate_idx][0]));
-      cv::Mat pt = (cv::Mat_<double>(3, 1)<<gate_corners_rel_[gate_idx][i].x,
-		    gate_corners_rel_[gate_idx][i].y,
-		    gate_corners_rel_[gate_idx][i].z);
-      double d = cv::norm(r * pt + tvec);
-      Eigen::Vector3d cam_h;
-      BackProject(corners_2d[i].x, corners_2d[i].y, 1.0, cam_h);
-      result[i] = d / cam_h.norm();
-    }
-
-    return result;
   }
 
   void SimpleVo::IRMarkerArrayCallback(const flightgoggles::IRMarkerArrayConstPtr& ptr) {
@@ -205,9 +212,7 @@ namespace simple_vo {
 	      ref_gate_corners[idx-1].x = iter->x;
 	      ref_gate_corners[idx-1].y = iter->y;
 
-	      StoreLandmark(p_ref_->landmarks_2d,
-		    gate_idx, idx,
-		    Eigen::Vector2d(iter->x, iter->y));
+	      StoreLandmark(p_ref_->landmarks_2d, gate_idx, idx, Eigen::Vector2d(iter->x, iter->y));
         ++iter;
       }
 
@@ -221,7 +226,7 @@ namespace simple_vo {
 
     auto p_curr = std::make_shared<Frame>();
     p_curr->timestamp = ptr->header.stamp.toSec();
-    
+
     std::vector<cv::Point3d> pts_3d;
     std::vector<cv::Point2d> pts_2d;
     auto iter = ptr->markers.begin();
@@ -233,7 +238,50 @@ namespace simple_vo {
       ++iter;
     }
 
-    UpdateEstimatedPositionsOfGates(p_curr);
+    // estimate motion via solvePnP
+    std::vector<cv::Point3d> known_landmarks;
+    std::vector<cv::Point2d> projections;
+
+    auto it = p_curr->landmarks_2d.begin();
+    while (it != p_curr->landmarks_2d.end()) {
+      if (HasLandmark(p_ref_->landmarks_2d, it->first) && HasLandmark(p_ref_->landmarks_3d, it->first)) {
+        const Eigen::Vector3d& pt3d = GetLandmark(p_ref_->landmarks_3d, it->first);
+        const Eigen::Vector2d& pt2d = GetLandmark(p_curr->landmarks_2d, it->first);
+        cv::Point3d p3d(pt3d[0], pt3d[1], pt3d[2]);
+        cv::Point2d p2d(pt2d[0], pt2d[1]);
+        known_landmarks.push_back(p3d);
+        projections.push_back(p2d);
+      }
+      ++it;
+    }
+    cv::Mat rvec;
+    cv::Mat tvec;
+    if (known_landmarks.size() == 3) {
+      std::vector<cv::Mat> rvecs;
+      std::vector<cv::Mat> tvecs;
+      int num_solutions = cv::solveP3P(known_landmarks, projections, k_, cv::Mat(), rvecs, tvecs, cv::SOLVEPNP_AP3P);
+      // pick up the solution with minumum displacement (since the update interval is short, it is impossible to have a big
+      // movement)
+      double best_solution = -1;
+      double best_dist = 1e9;
+      for (int s = 0; s < num_solutions; ++s) {
+        double dist = cv::norm(tvecs[s]);
+        ROS_INFO_STREAM("no:"<< s << " dist: "<<dist<<std::endl);
+        if (dist < best_dist) {
+          best_solution = s;
+          best_dist = dist;
+        }
+      }
+      ROS_INFO_STREAM("Num sol:"<< num_solutions << "Best sol: "<<best_solution);
+      rvec = rvecs[best_solution];
+      tvec = tvecs[best_solution];
+    } else if (known_landmarks.size() >= 4){
+      cv::solvePnP(known_landmarks, projections, k_, cv::Mat(), rvec, tvec);
+    }
+
+    UpdateEstimatedPositionsOfGates(p_curr, rvec, tvec);
+
+    p_ref_ = p_curr;
 
     visualization_msgs::Marker corners_marker;
     corners_marker.header.stamp = ros::Time::now();
