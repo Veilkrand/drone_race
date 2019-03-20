@@ -6,6 +6,7 @@
 #include <map>
 #include <Eigen/Core>
 #include <string>
+#include <opencv2/opencv.hpp>
 
 namespace simple_vo {
 
@@ -99,6 +100,16 @@ namespace simple_vo {
     pt.x = vec[0];
     pt.y = vec[1];
     pt.z = vec[2];
+  }
+
+  inline Eigen::MatrixXd CvMat2EigenMatrix(const cv::Mat& mat) {
+    Eigen::MatrixXd ret(mat.rows, mat.cols);
+    for (std::size_t r = 0; r < mat.rows; ++r) {
+      for (std::size_t c = 0; c < mat.cols; ++c) {
+        ret(r, c) = mat.at<double>(r, c);
+      }
+    }
+    return ret;
   }
 }
 

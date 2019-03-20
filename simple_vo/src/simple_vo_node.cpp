@@ -8,10 +8,10 @@
 #include <cstring>
 #include <string>
 #include <algorithm>
+#include <memory>
 
 #include <Eigen/Core>
 #include <Eigen/Dense>
-
 
 namespace simple_vo {
 
@@ -124,6 +124,7 @@ namespace simple_vo {
           proj_curr(cv::Range::all(), cv::Range(0, 3)) = r * 1.0;
           proj_curr.col(3) = tvec_movement * 1.0;
           cv::triangulatePoints(proj_ref, proj_curr, pts_2d, ref_pts, q);
+          ROS_INFO_STREAM(q.row(3));
           q.row(0) /= q.row(3);
           q.row(1) /= q.row(3);
           q.row(2) /= q.row(3);
@@ -229,34 +230,33 @@ namespace simple_vo {
 
     std::vector<cv::Point3d> pts_3d;
     std::vector<cv::Point2d> pts_2d;
-    auto iter = ptr->markers.begin();
-    while (iter != ptr->markers.end()) {
+    for (auto iter = ptr->markers.begin(); iter != ptr->markers.end(); ++iter) {
       std::size_t gate_idx = std::atoi(iter->landmarkID.data.substr(4).c_str());
       std::size_t idx = std::atoi(iter->markerID.data.c_str());
 
       StoreLandmark(p_curr->landmarks_2d, gate_idx, idx, Eigen::Vector2d(iter->x, iter->y));
-      ++iter;
     }
 
     // estimate motion via solvePnP
     std::vector<cv::Point3d> known_landmarks;
     std::vector<cv::Point2d> projections;
 
-    auto it = p_curr->landmarks_2d.begin();
-    while (it != p_curr->landmarks_2d.end()) {
-      if (HasLandmark(p_ref_->landmarks_2d, it->first) && HasLandmark(p_ref_->landmarks_3d, it->first)) {
+    for (auto it = p_curr->landmarks_2d.begin(); it != p_curr->landmarks_2d.end(); ++it) {
+      if (HasLandmark(p_ref_->landmarks_3d, it->first)) {
         const Eigen::Vector3d& pt3d = GetLandmark(p_ref_->landmarks_3d, it->first);
-        const Eigen::Vector2d& pt2d = GetLandmark(p_curr->landmarks_2d, it->first);
+        const Eigen::Vector2d& pt2d = it->second;
         cv::Point3d p3d(pt3d[0], pt3d[1], pt3d[2]);
         cv::Point2d p2d(pt2d[0], pt2d[1]);
         known_landmarks.push_back(p3d);
         projections.push_back(p2d);
       }
-      ++it;
     }
+
     cv::Mat rvec;
     cv::Mat tvec;
-    if (known_landmarks.size() == 3) {
+    cv::Mat inliners;
+
+    if (known_landmarks.size() == 3000) {
       std::vector<cv::Mat> rvecs;
       std::vector<cv::Mat> tvecs;
       int num_solutions = cv::solveP3P(known_landmarks, projections, k_, cv::Mat(), rvecs, tvecs, cv::SOLVEPNP_AP3P);
@@ -266,17 +266,70 @@ namespace simple_vo {
       double best_dist = 1e9;
       for (int s = 0; s < num_solutions; ++s) {
         double dist = cv::norm(tvecs[s]);
-        ROS_INFO_STREAM("no:"<< s << " dist: "<<dist<<std::endl);
         if (dist < best_dist) {
           best_solution = s;
           best_dist = dist;
         }
       }
-      ROS_INFO_STREAM("Num sol:"<< num_solutions << "Best sol: "<<best_solution);
       rvec = rvecs[best_solution];
       tvec = tvecs[best_solution];
     } else if (known_landmarks.size() >= 4){
-      cv::solvePnP(known_landmarks, projections, k_, cv::Mat(), rvec, tvec);
+      //cv::solvePnP(known_landmarks, projections, k_, cv::Mat(), rvec, tvec, false, cv::SOLVEPNP_EPNP);
+      ROS_INFO_STREAM("num landmarks: "<<known_landmarks.size());
+      cv::solvePnPRansac(known_landmarks, projections, k_, cv::Mat(), rvec, tvec, false, 100, 4.0f, 0.99, inliners);
+      ROS_INFO_STREAM("num inliners: "<<inliners.rows);
+    }
+
+    if (rvec.empty() || tvec.empty()) {
+      return;
+    }
+    
+    Sophus::SE3d t_c_r(Sophus::SO3d(rvec.at<double>(0), rvec.at<double>(1), rvec.at<double>(2)),
+                      Eigen::Vector3d(tvec.at<double>(0), tvec.at<double>(1), tvec.at<double>(2)));
+
+    typedef g2o::BlockSolver<g2o::BlockSolverTraits<6, 2>> Block;
+    Block::LinearSolverType* linear_solver = new g2o::LinearSolverEigen<Block::PoseMatrixType>();
+    // std::unique_ptr<Block> block_solver(new Block(linear_solver));
+    Block* solver_ptr = new Block(linear_solver);
+    //g2o::OptimizationAlgorithmDogleg* solver = new g2o::OptimizationAlgorithmDogleg(block_solver);
+    g2o::OptimizationAlgorithmLevenberg* solver = new g2o::OptimizationAlgorithmLevenberg(solver_ptr);
+    g2o::SparseOptimizer optimizer;
+    optimizer.setAlgorithm(solver);
+
+    g2o::VertexSE3Expmap* pose = new g2o::VertexSE3Expmap();
+    pose->setId(0);
+    pose->setEstimate(g2o::SE3Quat(t_c_r.rotationMatrix(), t_c_r.translation()));
+    optimizer.addVertex(pose);
+
+    const Eigen::Matrix3d& k = CvMat2EigenMatrix(k_);
+
+    for (int i = 0; i < inliners.rows; ++i) {
+      int index = inliners.at<int>(i, 0);
+      EdgeProjectXYZ2UVPoseOnly* edge = new EdgeProjectXYZ2UVPoseOnly();
+      edge->setId(i);
+      edge->setVertex(0, pose);
+      edge->set_k(k);
+      edge->set_point(Eigen::Vector3d(known_landmarks[i].x, known_landmarks[i].y, known_landmarks[i].z));
+      edge->setMeasurement(Eigen::Vector2d(projections[i].x, projections[i].y));
+      edge->setInformation(Eigen::Matrix2d::Identity());
+      optimizer.addEdge(edge);
+    }
+
+    optimizer.initializeOptimization();
+    optimizer.setVerbose(true);
+    optimizer.optimize(10);
+
+    t_c_r = Sophus::SE3d(pose->estimate().rotation(),
+                         pose->estimate().translation());
+
+    if (t_c_r.log().norm() > 5) {
+      ROS_INFO("Movement too big. Frame discarded.");
+      return;
+    }
+
+    // update gate corners location w.r.t. movement
+    for (auto it = p_ref_->landmarks_3d.begin(); it != p_ref_->landmarks_3d.end(); ++it) {
+      StoreLandmark(p_curr->landmarks_3d, it->first, t_c_r * it->second);
     }
 
     UpdateEstimatedPositionsOfGates(p_curr, rvec, tvec);

@@ -4,6 +4,8 @@ project(simple_vo)
 ## Compile as C++11, supported in ROS Kinetic and newer
 add_compile_options(-std=c++11)
 
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/cmake_modules")
+
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
@@ -17,7 +19,7 @@ find_package(catkin REQUIRED COMPONENTS
   tf2_geometry_msgs)
 
 find_package(sophus REQUIRED)
-
+find_package(G2O REQUIRED)
 find_package(flightgoggles REQUIRED)
 find_package(OpenCV 3 REQUIRED)
 
@@ -126,6 +128,7 @@ catkin_package(
 include_directories(
  include
  ${catkin_INCLUDE_DIRS}
+ ${G2O_INCLUDE_DIR}
  ${flightgoggles_INCLUDE_DIRS}
  ${OpenCV_INCLUDE_DIRS}
 )
@@ -144,7 +147,7 @@ include_directories(
 ## With catkin_make all packages are built within a single CMake context
 ## The recommended prefix ensures that target names across packages don't collide
 # add_executable(${PROJECT_NAME}_node src/simple_vo_node.cpp)
-add_executable(simple_vo src/simple_vo_node.cpp)
+add_executable(simple_vo src/simple_vo_node.cpp src/g2o_types.cpp)
 
 ## Rename C++ executable without prefix
 ## The above recommended prefix causes long target names, the following renames the
@@ -160,6 +163,10 @@ add_executable(simple_vo src/simple_vo_node.cpp)
 target_link_libraries(simple_vo
   ${catkin_LIBRARIES}
   ${OpenCV_LIBRARIES}
+  ${G2O_STUFF_LIBRARY}
+  ${G2O_CORE_LIBRARY}
+  ${G2O_TYPES_SBA}
+  ${G2O_SOLVER_EIGEN}
 )
 
 #############

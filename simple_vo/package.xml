@@ -36,6 +36,7 @@
   <depend>tf2</depend>
   <depend>tf2_ros</depend>
   <depend>sophus</depend>
+  <depend>libg2o</depend>
   <build_depend>flightgoggles</build_depend>
   <!--   Note that this is equivalent to the following: -->
   <!--   <build_depend>roscpp</build_depend> -->

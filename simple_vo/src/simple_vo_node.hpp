@@ -16,6 +16,8 @@
 
 #include "frame.hpp"
 
+#include "g2o_types.hpp"
+
 namespace simple_vo {
 
   class SimpleVo : public xros::RunnableNode<SimpleVo> {

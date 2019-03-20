@@ -2,6 +2,7 @@
 #define _SIMPLE_VO_FRAME_H_
 
 #include <sophus/se3.hpp>
+#include <opencv/cv.h>
 #include "common.hpp"
 
 namespace simple_vo {
