@@ -41,7 +41,7 @@ class OdometryAltimeterNode(object):
 
   def start(self):
     self.range_subscriber = rospy.Subscriber("/uav/sensors/downward_laser_rangefinder", Range, self.range_callback)
-    self.odometry_subscriber = rospy.Subscriber("/odometry/filtered", Odometry, self.odometry_callback)
+    self.odometry_subscriber = rospy.Subscriber("/odometry/map", Odometry, self.odometry_callback)
     self.altitude_publisher = rospy.Publisher('/odometry/altitude', PoseWithCovarianceStamped, queue_size=1)
     rospy.spin()
 

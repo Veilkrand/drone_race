@@ -4,7 +4,7 @@
 This node is used only during development to measure our odometer's accuracy.
 Depends on cascaded_pid_control/src/cheat_odometry_node.cpp to determine
 correct odometry. The approach is to compare our odometry estimate in
-/odometry/filtered to the ground truth in /CheatOdometryNode/odometry.
+/odometry/map to the ground truth in /CheatOdometryNode/odometry.
 """
 
 from __future__ import print_function

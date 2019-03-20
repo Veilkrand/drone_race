@@ -9,9 +9,9 @@ base_link_frame: base_link
 pose0: odometry/altitude
 pose0_config: [true,  true,  true,  # xyz
                true,  true,  true,  # rpy
-               false, false, false, # v/xyz
-               false, false, false, # v/rpy
-               false, false, false] # a/xyz
+               true,  true,  true,  # v/xyz
+               true,  true,  true,  # v/rpy
+               true,  true,  true]  # a/xyz
 pose0_differential: false
 pose0_relative: false
 pose0_queue_size: 1
@@ -19,10 +19,10 @@ pose0_rejection_threshold: 100  # Note the difference in parameter name
 pose0_nodelay: true
 
 # IMU
-imu0: uav/sensors/imu
-imu0_config: [false, false, false, # xyz
-              false, false, false, # rpy
-              false, false, false, # v/xyz
+imu0: odometry/imu
+imu0_config: [true,  true,  true,  # xyz
+              true,  true,  true,  # rpy
+              true,  true,  true,  # v/xyz
               true,  true,  true,  # v/rpy
               true,  true,  true]  # a/xyz
 imu0_nodelay: false

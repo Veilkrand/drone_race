@@ -10,9 +10,6 @@ from nav_msgs.msg import Odometry
 
 class OdometrySplitNode(object):
   def __init__(self):
-    self.odometry_actual = None
-    self.odometry_measured = None
-
     self.odometry_subscriber = None
     self.odometry_odom_publisher = None
     self.odometry_map_publisher = None
