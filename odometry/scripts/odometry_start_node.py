@@ -7,29 +7,18 @@ odometry format to initialize odometry.
 """
 
 import rospy
-import math
-from nav_msgs.msg import Odometry
-from geometry_msgs.msg import Point, Quaternion, PoseWithCovarianceStamped
-from sensor_msgs.msg import Imu
-from tf.transformations import euler_from_quaternion
+from geometry_msgs.msg import PoseWithCovarianceStamped
 from robot_localization.srv import SetPose
 
 class OdometryStartNode(object):
   def __init__(self):
     self.init_pose_param = None
-    self.init_pose_pub = None
 
   def start(self):
-    rospy.loginfo("waiting for service")
     rospy.wait_for_service('set_pose')
-    rospy.loginfo("service available")
     set_pose_service = rospy.ServiceProxy('set_pose', SetPose)
 
-    rate = rospy.Rate(10)
-    while not rospy.is_shutdown() and self.init_pose_param  is None:
-      self.init_pose_param = rospy.get_param("/uav/flightgoggles_uav_dynamics/init_pose", None)
-      if self.init_pose_param is None:
-        rate.sleep()
+    self.init_pose_param = rospy.get_param("/uav/flightgoggles_uav_dynamics/init_pose")
 
     pose = PoseWithCovarianceStamped()
     pose.header.stamp = rospy.Time.now()
