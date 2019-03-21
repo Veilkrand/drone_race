@@ -1,0 +1,9 @@
+<launch>
+    <arg name="" default="false" />
+    <!-- Launch the cascaded_pid_control node -->
+    <include file="$(find drone_race)/cascaded_pid_control/launch/flightgoggles_core.launch" />
+    <!-- Launch the cascaded_pid_control node -->
+    <include file="$(find drone_race)/cascaded_pid_control/launch/spline_planner.launch"
+    <!-- Launch the odometry node -->
+    <include file="$(find drone_race)/odometry/launch/odometry.launch" />
+</launch>
