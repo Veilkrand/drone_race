@@ -12,5 +12,6 @@
   <node pkg="odometry" type="odometry_altimeter_node.py" name="odometry_altimeter" output="screen" />
   <node pkg="odometry" type="odometry_split_node.py" name="odometry_split" output="screen" />
   <node pkg="odometry" type="odometry_imu_node.py" name="odometry_imu" output="screen" />
+  <node pkg="odometry" type="odometry_gate_node.py" name="odometry_gate" output="screen" />
 </launch>
 
