@@ -1,5 +1,5 @@
-#ifndef _SIMPLE_VO_COMMON_H_
-#define _SIMPLE_VO_COMMON_H_
+#ifndef _GATE_EST_COMMON_H_
+#define _GATE_EST_COMMON_H_
 
 #include <cstddef>
 #include <cstring>
@@ -8,10 +8,12 @@
 #include <string>
 #include <opencv2/opencv.hpp>
 
-namespace simple_vo {
+namespace gate_est {
 
   typedef std::map<std::size_t, Eigen::Vector3d> Landmark3D;
   typedef std::map<std::size_t, Eigen::Vector2d> Landmark2D;
+  typedef std::shared_ptr<Landmark3D> Landmark3DPtr;
+  typedef std::shared_ptr<Landmark2D> Landmark2DPtr;
 
   inline std::size_t GetLandmarkKey(std::size_t gate_idx, std::size_t corner_idx) {
     return 100000 + gate_idx * 100 + corner_idx;

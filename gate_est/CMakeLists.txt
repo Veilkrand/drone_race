@@ -1,10 +1,8 @@
 cmake_minimum_required(VERSION 2.8.3)
-project(simple_vo)
+project(gate_est)
 
 ## Compile as C++11, supported in ROS Kinetic and newer
 add_compile_options(-std=c++11)
-
-set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/cmake_modules")
 
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
@@ -18,10 +16,9 @@ find_package(catkin REQUIRED COMPONENTS
   tf2_ros
   tf2_geometry_msgs)
 
-find_package(sophus REQUIRED)
-find_package(G2O REQUIRED)
 find_package(flightgoggles REQUIRED)
 find_package(OpenCV 3 REQUIRED)
+find_package(Ceres REQUIRED)
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
@@ -114,9 +111,9 @@ find_package(OpenCV 3 REQUIRED)
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
 #  INCLUDE_DIRS include
-#  LIBRARIES simple_vo
+#  LIBRARIES gate_est
 #  CATKIN_DEPENDS other_catkin_pkg
-  DEPENDS sophus
+#  DEPENDS system_lib
 )
 
 ###########
@@ -128,14 +125,14 @@ catkin_package(
 include_directories(
  include
  ${catkin_INCLUDE_DIRS}
- ${G2O_INCLUDE_DIR}
  ${flightgoggles_INCLUDE_DIRS}
  ${OpenCV_INCLUDE_DIRS}
+ ${CERES_INCLUDE_DIRS}
 )
 
 ## Declare a C++ library
 # add_library(${PROJECT_NAME}
-#   src/${PROJECT_NAME}/simple_vo.cpp
+#   src/${PROJECT_NAME}/gate_est.cpp
 # )
 
 ## Add cmake target dependencies of the library
@@ -146,8 +143,7 @@ include_directories(
 ## Declare a C++ executable
 ## With catkin_make all packages are built within a single CMake context
 ## The recommended prefix ensures that target names across packages don't collide
-# add_executable(${PROJECT_NAME}_node src/simple_vo_node.cpp)
-add_executable(simple_vo src/simple_vo_node.cpp src/g2o_types.cpp)
+add_executable(gate_est src/gate_est_node.cpp)
 
 ## Rename C++ executable without prefix
 ## The above recommended prefix causes long target names, the following renames the
@@ -160,13 +156,13 @@ add_executable(simple_vo src/simple_vo_node.cpp src/g2o_types.cpp)
 # add_dependencies(${PROJECT_NAME}_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
 ## Specify libraries to link a library or executable target against
-target_link_libraries(simple_vo
+# target_link_libraries(${PROJECT_NAME}_node
+#   ${catkin_LIBRARIES}
+# )
+target_link_libraries(gate_est
   ${catkin_LIBRARIES}
   ${OpenCV_LIBRARIES}
-  ${G2O_STUFF_LIBRARY}
-  ${G2O_CORE_LIBRARY}
-  ${G2O_TYPES_SBA}
-  ${G2O_SOLVER_EIGEN}
+  ${CERES_LIBRARIES}
 )
 
 #############
@@ -209,7 +205,7 @@ target_link_libraries(simple_vo
 #############
 
 ## Add gtest based cpp test target and link libraries
-# catkin_add_gtest(${PROJECT_NAME}-test test/test_simple_vo.cpp)
+# catkin_add_gtest(${PROJECT_NAME}-test test/test_gate_est.cpp)
 # if(TARGET ${PROJECT_NAME}-test)
 #   target_link_libraries(${PROJECT_NAME}-test ${PROJECT_NAME})
 # endif()

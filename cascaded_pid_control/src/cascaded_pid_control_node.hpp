@@ -84,6 +84,7 @@ namespace cascaded_pid_control {
     void TrajectoryCallback(const trajectory_msgs::MultiDOFJointTrajectoryConstPtr& ptr);
     void TrajectoryCallbackNew(const trajectory_msgs::MultiDOFJointTrajectoryConstPtr& ptr);
     void TrajectoryCallbackStartFromNearest(const trajectory_msgs::MultiDOFJointTrajectoryConstPtr& ptr);    
+    void TrajectoryCallbackStartFromNearest2(const trajectory_msgs::MultiDOFJointTrajectoryConstPtr& ptr);        
 
     void TimerCallback(const ros::TimerEvent& e);
 

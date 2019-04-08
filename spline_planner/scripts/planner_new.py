@@ -11,6 +11,7 @@ from std_msgs.msg import ColorRGBA
 from collections import deque
 import tf
 import numpy as np
+import time
 
 from spline import *
 
@@ -20,6 +21,9 @@ def vector3_to_ndarray(vec):
 
 def point_to_ndarray(point):
   return np.array([point.x, point.y, point.z])
+
+def quaternion_to_ndarray(q):
+  return np.array([q.x, q.y, q.z, q.w])
 
 def vec_to_quat(vec):
     """To fully determine the orientation represented by the resulting quaternion, this method will assume the top of objects would always facing up
@@ -55,10 +59,84 @@ class SplinePlannerNew(object):
     self.current_position = None
     self.current_velocity = None
     self.current_acceleration = None
+    self.initial_position = None
+    self.previous_gate_idx = None
     self.target_gate_idx = None
-    self.gates_sequence = [10, 21, 2, 13, 9, 14, 1, 22, 15, 23, 6]
+    self.gates_sequence = []
     self.current_path = None
     self.stop_planning = False
+    self.waypoint_speeds = []
+
+  def rprop_optimize(self, waypoints, d1, d2):
+    new_d1 = d1.copy()
+    start = time.time()
+
+    min_k_path = None
+    min_k = None
+    t_start = None
+
+    eta_inc = 1.2
+    eta_dec = 0.5
+    factor = 1
+    delta = 0.1
+    last_ks = []
+    last_factors = []
+
+    for i in range(1):
+      path = propose_geometric_spline_path(waypoints, new_d1, d2)
+      trajectory_points = sample_path([path[0]])
+      trajectory_points, info = self.calculate_points_with_geometric_information(trajectory_points)
+      print(factor, info['max_k'])
+      if min_k is None or info['max_k'] < min_k:
+        min_k = info['max_k']
+        min_k_path = path
+
+      last_factors.append(factor)
+      last_ks.append(info['max_k'])
+      if len(last_ks) > 3:
+        del last_factors[0]
+        del last_ks[0]
+
+      if len(last_ks) == 1:
+        t_start = trajectory_points[0]['d1']
+
+      if len(last_ks) == 3:
+        grad_1 = last_ks[-1] - last_ks[-2]
+        grad_2 = last_ks[-2] - last_ks[-3]
+        change = last_factors[-1] - last_factors[-2]
+        if grad_1 * grad_2 > 0:
+          change *= eta_inc
+        else:
+          change *= eta_dec
+
+        delta = np.sign(grad_1) * change
+
+      factor += delta
+      new_d1[0] = t_start * factor
+    end = time.time()
+    rospy.loginfo("Time used: {}".format(end-start))
+    trajectory_points = sample_path(min_k_path)
+    trajectory_points, _ = self.calculate_points_with_geometric_information(trajectory_points)
+    return trajectory_points
+
+  def generate_trajectory_strategy_2(self):
+    """Instead of using current position as the starting re-planning waypoint, this strategy don't
+    use any information about the current position of the drone. It instead only use 3 nearby gate 
+    positions (or the initial position if we're at the very beginning) to generate a new trajectory.
+    """
+    if self.previous_gate_idx is None:
+      wp0 = self.initial_position
+    else:
+      wp0 = self.gate_locations[self.previous_gate_idx]['center']
+    wp1 = self.get_waypoint_for_next_n_gate(1)
+    wp2 = self.get_waypoint_for_next_n_gate(2)
+    d1, d2 = {}, {}
+    path = propose_geometric_spline_path((wp0, wp1, wp2))
+    trajectory_points = sample_path(path)
+    trajectory_points, info = self.calculate_points_with_geometric_information(trajectory_points)
+    path = self.generate_velocity_profile(trajectory_points)
+    self.current_path = path
+    return path
 
   def generate_trajectory(self):
     # every time when re-planning, there are 3 raw waypoints:
@@ -92,8 +170,17 @@ class SplinePlannerNew(object):
       wp2 = self.get_waypoint_for_next_n_gate(2)
 
     self.publish_raw_waypoints_viz(wp0, wp1, wp2)
+    # path = propose_geometric_spline_path((wp0, wp1, wp2), d1, d2)
+    # trajectory_points = sample_path(path)
+
+    current_speed = np.linalg.norm(self.current_velocity)
+    if current_speed > 0.01:
+      d1[0] = self.current_velocity / current_speed * np.linalg.norm(wp1 - wp0) * 0.1
+    
+    #path = self.rprop_optimize((wp0, wp1, wp2), d1, d2)
     path = propose_geometric_spline_path((wp0, wp1, wp2), d1, d2)
     trajectory_points = sample_path(path)
+    trajectory_points, info = self.calculate_points_with_geometric_information(trajectory_points)
     path = self.generate_velocity_profile(trajectory_points)
     self.current_path = path
     return path
@@ -128,7 +215,8 @@ class SplinePlannerNew(object):
       return self.gate_locations[self.gates_sequence[n - 2]]['center']
 
   def generate_velocity_profile(self, points):
-    trajectory_points = self.calculate_points_with_geometric_information(points)
+    # trajectory_points = self.calculate_points_with_geometric_information(points)
+    trajectory_points = points
 
     trajectory_points[0]['speed'] = np.linalg.norm(self.current_velocity)
     trajectory_points[0]['velocity'] = self.current_velocity
@@ -167,6 +255,8 @@ class SplinePlannerNew(object):
 
   def calculate_points_with_geometric_information(self, points):
     result = []
+    info = {}
+    max_k = 0
     this_point = None # type: {}
     last_point = None # type: {}
     for (s, t), (pt, d1, d2) in points:
@@ -216,9 +306,11 @@ class SplinePlannerNew(object):
         'unit_b': unit_binormal,
         'curvature': k
       }
+      if k > max_k:
+        max_k = k
       result.append(this_point)
-
-    return result
+    info['max_k'] = max_k
+    return result, info
 
   def publish_raw_waypoints_viz(self, *waypoints):
     raw_waypoints_marker = Marker()
@@ -259,6 +351,7 @@ class SplinePlannerNew(object):
       rospy.loginfo("No next targeting gate.")
       self.target_gate_idx = None
       return False
+    self.previous_gate_idx = self.target_gate_idx
     self.target_gate_idx = self.gates_sequence[0]
     del self.gates_sequence[0]
     rospy.loginfo("Next gate: {}".format(self.target_gate_idx))
@@ -292,7 +385,9 @@ class SplinePlannerNew(object):
     self.current_position = point_to_ndarray(odometry.pose.pose.position)
 
     prev_velocity = self.current_velocity
-    self.current_velocity = vector3_to_ndarray(odometry.twist.twist.linear)
+    self.current_velocity = SplinePlannerNew.rotate_vector_wrt_quaternion(
+                                                quaternion_to_ndarray(odometry.pose.pose.orientation),
+                                                vector3_to_ndarray(odometry.twist.twist.linear))
 
     if prev_velocity is not None and prev_time is not None:
       self.current_acceleration = (self.current_velocity - prev_velocity) / (self.current_time - prev_time)
@@ -307,6 +402,16 @@ class SplinePlannerNew(object):
       else:
         rospy.loginfo("All gates have been visited. Stop planning.")
         self.stop_planning = True
+
+  @staticmethod
+  def rotate_vector_wrt_quaternion(q, v):
+    p = np.array([0, 0, 0, 0], dtype=np.float)
+    p[0:3] = v
+    # p' = q * p * q'
+    p_prime = tf.transformations.quaternion_multiply(
+                tf.transformations.quaternion_multiply(q, p),
+                tf.transformations.quaternion_inverse(q))
+    return p_prime[:3]
 
   def reconfigure_parameteres(self, config, level):
     rospy.loginfo("""Parameters reconfiguration requested:
@@ -354,21 +459,31 @@ max_total_acceleration: {max_total_acceleration}""".format(**config))
     self.gates_sequence = list(int(g.replace("Gate", ""), 10) for g in gates)
     rospy.loginfo("Course loaded. Gate sequence: {}".format(self.gates_sequence))
 
+  def load_initial_pose(self):
+    """Load initial pose of the drone"""
+    pose = rospy.get_param("/uav/flightgoggles_uav_dynamics/init_pose")
+    px, py, pz, qx, qy, qz, qw = pose
+    self.initial_position = np.array([px, py, pz], dtype=np.float)
+    self.initial_orientation = np.array([qx, qy, qz, qw], dtype=np.float)
+
   def start(self, name="SplinePlannerNew"):
     rospy.init_node(name)
     self.srv = Server(PlannerConfig, self.reconfigure_parameteres)
+
     self.load_nominal_gates_locations()
     self.load_course_gates()
+    self.load_initial_pose()
+    
     self.odometry_sub = rospy.Subscriber("~odometry", Odometry, self.odometry_callback)
     self.traj_pub = rospy.Publisher("~trajectory", MultiDOFJointTrajectory, queue_size=1, latch=True)
     self.raw_waypoints_viz_pub = rospy.Publisher("~raw_waypoints_viz", Marker, queue_size=1, latch=True)
     rospy.loginfo("Planner node ready.")
     self.head_for_next_gate()
-    rate = rospy.Rate(2)
+    rate = rospy.Rate(1)
     while not rospy.is_shutdown():
       if not self.stop_planning:
         if self.current_position is not None and self.target_gate_idx is not None:
-          trajectory = self.generate_trajectory()
+          trajectory = self.generate_trajectory_strategy_2()
           if trajectory is None:
             rospy.logwarn("Failed to generate trajectory")
           else:

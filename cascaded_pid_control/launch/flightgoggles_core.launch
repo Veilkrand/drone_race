@@ -1,7 +1,7 @@
 <launch>
   <!-- Launch settings. To be passed into launch file. -->
   <arg name="use_dynamics" default="1" />
-  <arg name="use_external_renderer" default="0" />
+  <arg name="use_external_renderer" default="1" />
   <arg name="ignore_collisions" default="false" />
   <arg name="render_stereo" default="0" />
   <arg name="run_challenges" default="1" /> 

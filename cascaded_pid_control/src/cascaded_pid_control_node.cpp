@@ -161,7 +161,7 @@ namespace cascaded_pid_control {
 
     rate_thrust_pub_ = private_nh_.advertise<mav_msgs::RateThrust>("rateThrust", 1);
     odometry_sub_ = private_nh_.subscribe<nav_msgs::Odometry>("odometry", 1, &CascadedPidControl::OdometryCallback, this);
-    trajectory_sub_ = private_nh_.subscribe<trajectory_msgs::MultiDOFJointTrajectory>("trajectory", 1, &CascadedPidControl::TrajectoryCallbackStartFromNearest, this);
+    trajectory_sub_ = private_nh_.subscribe<trajectory_msgs::MultiDOFJointTrajectory>("trajectory", 1, &CascadedPidControl::TrajectoryCallbackStartFromNearest2, this);
 
     if (publish_debug_topic_) {
       position_setpoint_pub_ = private_nh_.advertise<geometry_msgs::Vector3>("positionSetpoint", 8);
@@ -253,6 +253,81 @@ namespace cascaded_pid_control {
     velocity_error_pub_.publish(vel_error);
     attitude_error_pub_.publish(att_error);
   }
+
+  void CascadedPidControl::TrajectoryCallbackStartFromNearest2(const trajectory_msgs::MultiDOFJointTrajectoryConstPtr& ptr) {
+    if (ptr->points.size() == 0) {
+      ROS_WARN("Empty trajectory.");
+      return;
+    }
+
+    ROS_INFO("New trajectory arrived.");
+
+    bool restart = traj_points_.size() == 0;
+
+    timer_.stop();
+    traj_points_.clear();
+    command_wait_time_.clear();
+
+    auto iter = ptr->points.begin();
+    double last_time = iter->time_from_start.toSec();
+    command_wait_time_.push_back(last_time);
+    mav_msgs::EigenTrajectoryPoint eigen_traj_point;
+    mav_msgs::eigenTrajectoryPointFromMsg(*iter, &eigen_traj_point);
+    traj_points_.push_back(eigen_traj_point);
+
+    double nearest_dist = 1e9;
+    bool nearest_found = false;
+    double threshold_dist;
+    int nearest_idx = 0;
+
+    if (restart) {
+      nearest_found = true;
+    } else {
+      threshold_dist = (set_point_.position_W - eigen_traj_point.position_W).norm();
+      nearest_dist = threshold_dist;
+    }
+
+    for (++iter; iter != ptr->points.end(); ++iter) {
+      double traj_time = iter->time_from_start.toSec();
+      command_wait_time_.push_back(traj_time - last_time);
+      mav_msgs::eigenTrajectoryPointFromMsg(*iter, &eigen_traj_point);
+      traj_points_.push_back(eigen_traj_point);
+
+      if (!nearest_found) {
+        double dist = (set_point_.position_W- eigen_traj_point.position_W).norm();
+        if (dist > threshold_dist) {
+          nearest_found = true;
+        } else {
+          if (dist < nearest_dist) {
+            nearest_dist = dist;
+            nearest_idx = iter - ptr->points.begin();
+          }
+        }
+      }
+
+      last_time = traj_time;
+    }
+
+    ROS_INFO("The closest trajectory point to the current position is at index %d.", nearest_idx);
+
+    while (traj_points_.size() > 1 && nearest_idx-- > 0) {
+      traj_points_.pop_front();
+      command_wait_time_.pop_front();
+    }
+
+    SetNextPoint(traj_points_.front());
+    traj_points_.pop_front();
+
+    if (!traj_points_.empty()) {
+      double wait_time = command_wait_time_.front();
+      command_wait_time_.pop_front();
+      timer_.setPeriod(ros::Duration(wait_time));
+      timer_.start();
+    }
+
+    controller_active_ = true;    
+  }
+
 
   void CascadedPidControl::TrajectoryCallbackStartFromNearest(const trajectory_msgs::MultiDOFJointTrajectoryConstPtr& ptr) {
     // This trajectory handler when receiving a new trajectory, pickup the neartest waypoint to the current position and
@@ -497,7 +572,7 @@ namespace cascaded_pid_control {
     set_point_ = point;
     if (publish_debug_topic_) {
       geometry_msgs::PoseStamped msg;
-      msg.header.frame_id = "world";
+      msg.header.frame_id = "map";
       msg.header.stamp = ros::Time::now();
       mav_msgs::pointEigenToMsg(set_point_.position_W, &msg.pose.position);
       mav_msgs::quaternionEigenToMsg(set_point_.orientation_W_B, &msg.pose.orientation);
