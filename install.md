@@ -26,15 +26,7 @@ sudo apt-get install ros-kinetic-desktop-full ros-kinetic-joy ros-kinetic-octoma
 sudo rosdep init
 rosdep update
 ```
-For Ubuntu 18.1 and Ros Kinetic
-```sh
-sudo sh -c 'echo "deb http://packages.ros.org/ros/ubuntu xenial main" > /etc/apt/sources.list.d/ros-latest.list'
-wget http://packages.ros.org/ros.key -O - | sudo apt-key add -
-sudo apt-get update
-sudo apt-get install ros-kinetic-desktop-full ros-kinetic-joy ros-kinetic-octomap-ros ros-kinetic-mavlink python-wstool python-catkin-tools protobuf-compiler libgoogle-glog-dev ros-kinetic-control-toolbox autoconf
-sudo rosdep init
-rosdep update
-```
+
 
 It is also recommended to install some useful extra ROS packages. These packages are mainly for helping visualizing various runtime information on RViz (if you are going to run main functionalities in headless server then you don't need to install them. Install them where you have display is enough): 
 ```sh
