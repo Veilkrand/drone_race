@@ -1,0 +1,360 @@
+diff --git a/ar_demo/src/ar_demo_node.cpp b/ar_demo/src/ar_demo_node.cpp
+index 95c3a22..4699fe3 100644
+--- a/ar_demo/src/ar_demo_node.cpp
++++ b/ar_demo/src/ar_demo_node.cpp
+@@ -64,7 +64,7 @@ void axis_generate(visualization_msgs::Marker &line_list, Vector3d &origin, int
+ {
+ 
+     line_list.id = id;
+-    line_list.header.frame_id = "world";
++    line_list.header.frame_id = "start";
+     line_list.header.stamp = ros::Time::now();
+     line_list.action = visualization_msgs::Marker::ADD;
+     line_list.type = visualization_msgs::Marker::LINE_LIST;
+@@ -101,7 +101,7 @@ void cube_generate(visualization_msgs::Marker &marker, Vector3d &origin, int id)
+ {
+ 
+     //uint32_t shape = visualization_msgs::Marker::CUBE;
+-    marker.header.frame_id = "world";
++    marker.header.frame_id = "start";
+     marker.header.stamp = ros::Time::now();
+     marker.ns = "basic_shapes";
+     marker.id = 0;
+diff --git a/benchmark_publisher/src/benchmark_publisher_node.cpp b/benchmark_publisher/src/benchmark_publisher_node.cpp
+index c405c87..eb0ec82 100644
+--- a/benchmark_publisher/src/benchmark_publisher_node.cpp
++++ b/benchmark_publisher/src/benchmark_publisher_node.cpp
+@@ -92,8 +92,8 @@ void odom_callback(const nav_msgs::OdometryConstPtr &odom_msg)
+ 
+     nav_msgs::Odometry odometry;
+     odometry.header.stamp = ros::Time(benchmark[idx - 1].t);
+-    odometry.header.frame_id = "world";
+-    odometry.child_frame_id = "world";
++    odometry.header.frame_id = "start";
++    odometry.child_frame_id = "start";
+ 
+     Vector3d tmp_T = baseTgt + baseRgt * Vector3d{benchmark[idx - 1].px, benchmark[idx - 1].py, benchmark[idx - 1].pz};
+     odometry.pose.pose.position.x = tmp_T.x();
+diff --git a/config/flightgoggles/flightgoggles_config.yaml b/config/flightgoggles/flightgoggles_config.yaml
+new file mode 100644
+index 0000000..df39520
+--- /dev/null
++++ b/config/flightgoggles/flightgoggles_config.yaml
+@@ -0,0 +1,84 @@
++%YAML:1.0
++
++#common parameters
++imu_topic: "/uav/sensors/imu"
++image_topic: "/uav/camera/left/image_rect_color"
++output_path: "/home/x/output/"
++
++# MEI is better than PINHOLE for large FOV camera
++model_type: PINHOLE
++camera_name: camera
++image_width: 1024
++image_height: 768
++distortion_parameters:
++   k1: 0
++   k2: 0
++   p1: 0
++   p2: 0
++projection_parameters:
++   fx: 548.4088134765625
++   fy: 548.4088134765625
++   cx: 512.0
++   cy: 384.0
++
++# Extrinsic parameter between IMU and Camera.
++estimate_extrinsic: 0   # 0  Have an accurate extrinsic parameters. We will trust the following imu^R_cam, imu^T_cam, don't change it.
++                        # 1  Have an initial guess about extrinsic parameters. We will optimize around your initial guess.
++                        # 2  Don't know anything about extrinsic parameters. You don't need to give R,T. We will try to calibrate it. Do some rotation movement at beginning. 
++#If you choose 0 or 1, you should write down the following matrix.
++#Rotation from camera frame to imu frame, imu^R_cam
++extrinsicRotation: !!opencv-matrix
++   rows: 3
++   cols: 3
++   dt: d
++   data: [ 0, 0, 1, 
++           -1, 0, 0, 
++           0, -1, 0]
++
++#Translation from camera frame to imu frame, imu^T_cam
++extrinsicTranslation: !!opencv-matrix
++   rows: 3
++   cols: 1
++   dt: d
++   data: [ 0, 0, 0]
++
++#feature traker paprameters
++
++max_cnt: 150            # max feature number in feature tracking
++min_dist: 20            # min distance between two features 
++freq: 20                # frequence (Hz) of publish tracking result. At least 10Hz for good estimation. If set 0, the frequence will be same as raw image 
++F_threshold: 1.0        # ransac threshold (pixel)
++show_track: 1           # publish tracking image as topic
++equalize: 0             # if image is too dark or light, trun on equalize to find enough features
++fisheye: 0              # if using fisheye, trun on it. A circle mask will be loaded to remove edge noisy points
++#optimization parameters
++
++max_solver_time: 0.035   # max solver itration time (ms), to guarantee real time
++max_num_iterations: 10   # max solver itrations, to guarantee real time
++keyframe_parallax: 10.0  # keyframe selection threshold (pixel)
++
++#imu parameters       The more accurate parameters you provide, the better performance
++acc_n: 0.2          # accelerometer measurement noise standard deviation.
++gyr_n: 0.05         # gyroscope measurement noise standard deviation.
++acc_w: 0.002        # accelerometer bias random work noise standard deviation.
++gyr_w: 4.0e-5       # gyroscope bias random work noise standard deviation.
++g_norm: 9.805       #
++
++#loop closure parameters
++loop_closure: 0                 # start loop closure
++load_previous_pose_graph: 0     # load and reuse previous pose graph; load from 'pose_graph_save_path'
++fast_relocalization: 0          # useful in real-time and large project
++pose_graph_save_path: "/home/tony-ws1/output/pose_graph/" # save and load path
++
++#unsynchronization parameters
++estimate_td: 1                      # online estimate time offset between camera and imu
++td: 0.000                           # initial value of time offset. unit: s. readed image clock + td = real image clock (IMU clock)
++
++#rolling shutter parameters
++rolling_shutter: 0                  # 0: global shutter camera, 1: rolling shutter camera
++rolling_shutter_tr: 0               # unit: s. rolling shutter read out time per frame (from data sheet). 
++
++#visualization parameters
++save_image: 1                   # save image in pose graph for visualization prupose; you can close this function by setting 0 
++visualize_imu_forward: 0        # output imu forward propogation to achieve low latency and high frequence results
++visualize_camera_size: 0.4      # size of camera marker in RVIZ
+\ No newline at end of file
+diff --git a/feature_tracker/src/feature_tracker_node.cpp b/feature_tracker/src/feature_tracker_node.cpp
+index 5a5261c..6e0a5da 100644
+--- a/feature_tracker/src/feature_tracker_node.cpp
++++ b/feature_tracker/src/feature_tracker_node.cpp
+@@ -121,7 +121,7 @@ void img_callback(const sensor_msgs::ImageConstPtr &img_msg)
+         sensor_msgs::ChannelFloat32 velocity_y_of_point;
+ 
+         feature_points->header = img_msg->header;
+-        feature_points->header.frame_id = "world";
++        feature_points->header.frame_id = "start";
+ 
+         vector<set<int>> hash_ids(NUM_OF_CAM);
+         for (int i = 0; i < NUM_OF_CAM; i++)
+diff --git a/pose_graph/src/pose_graph.cpp b/pose_graph/src/pose_graph.cpp
+index ada5065..c4732ee 100644
+--- a/pose_graph/src/pose_graph.cpp
++++ b/pose_graph/src/pose_graph.cpp
+@@ -137,7 +137,7 @@ void PoseGraph::addKeyFrame(KeyFrame* cur_kf, bool flag_detect_loop)
+     Quaterniond Q{R};
+     geometry_msgs::PoseStamped pose_stamped;
+     pose_stamped.header.stamp = ros::Time(cur_kf->time_stamp);
+-    pose_stamped.header.frame_id = "world";
++    pose_stamped.header.frame_id = "start";
+     pose_stamped.pose.position.x = P.x() + VISUALIZATION_SHIFT_X;
+     pose_stamped.pose.position.y = P.y() + VISUALIZATION_SHIFT_Y;
+     pose_stamped.pose.position.z = P.z();
+@@ -241,7 +241,7 @@ void PoseGraph::loadKeyFrame(KeyFrame* cur_kf, bool flag_detect_loop)
+     Quaterniond Q{R};
+     geometry_msgs::PoseStamped pose_stamped;
+     pose_stamped.header.stamp = ros::Time(cur_kf->time_stamp);
+-    pose_stamped.header.frame_id = "world";
++    pose_stamped.header.frame_id = "start";
+     pose_stamped.pose.position.x = P.x() + VISUALIZATION_SHIFT_X;
+     pose_stamped.pose.position.y = P.y() + VISUALIZATION_SHIFT_Y;
+     pose_stamped.pose.position.z = P.z();
+@@ -606,7 +606,7 @@ void PoseGraph::updatePath()
+ 
+         geometry_msgs::PoseStamped pose_stamped;
+         pose_stamped.header.stamp = ros::Time((*it)->time_stamp);
+-        pose_stamped.header.frame_id = "world";
++        pose_stamped.header.frame_id = "start";
+         pose_stamped.pose.position.x = P.x() + VISUALIZATION_SHIFT_X;
+         pose_stamped.pose.position.y = P.y() + VISUALIZATION_SHIFT_Y;
+         pose_stamped.pose.position.z = P.z();
+@@ -881,7 +881,7 @@ void PoseGraph::publish()
+             posegraph_visualization->publish_by(pub_pose_graph, path[sequence_cnt].header);
+         }
+     }
+-    base_path.header.frame_id = "world";
++    base_path.header.frame_id = "start";
+     pub_base_path.publish(base_path);
+     //posegraph_visualization->publish_by(pub_pose_graph, path[sequence_cnt].header);
+ }
+diff --git a/pose_graph/src/pose_graph_node.cpp b/pose_graph/src/pose_graph_node.cpp
+index 122821c..f935632 100644
+--- a/pose_graph/src/pose_graph_node.cpp
++++ b/pose_graph/src/pose_graph_node.cpp
+@@ -234,7 +234,7 @@ void vio_callback(const nav_msgs::Odometry::ConstPtr &pose_msg)
+ 
+     visualization_msgs::Marker key_odometrys;
+     key_odometrys.header = pose_msg->header;
+-    key_odometrys.header.frame_id = "world";
++    key_odometrys.header.frame_id = "start";
+     key_odometrys.ns = "key_odometrys";
+     key_odometrys.type = visualization_msgs::Marker::SPHERE_LIST;
+     key_odometrys.action = visualization_msgs::Marker::ADD;
+@@ -267,12 +267,12 @@ void vio_callback(const nav_msgs::Odometry::ConstPtr &pose_msg)
+     {
+         geometry_msgs::PoseStamped pose_stamped;
+         pose_stamped.header = pose_msg->header;
+-        pose_stamped.header.frame_id = "world";
++        pose_stamped.header.frame_id = "start";
+         pose_stamped.pose.position.x = vio_t.x();
+         pose_stamped.pose.position.y = vio_t.y();
+         pose_stamped.pose.position.z = vio_t.z();
+         no_loop_path.header = pose_msg->header;
+-        no_loop_path.header.frame_id = "world";
++        no_loop_path.header.frame_id = "start";
+         no_loop_path.poses.push_back(pose_stamped);
+         pub_vio_path.publish(no_loop_path);
+     }
+diff --git a/vins_estimator/launch/flightgoggles.launch b/vins_estimator/launch/flightgoggles.launch
+new file mode 100644
+index 0000000..1065a7f
+--- /dev/null
++++ b/vins_estimator/launch/flightgoggles.launch
+@@ -0,0 +1,23 @@
++<launch>
++    <arg name="config_path" default = "$(find feature_tracker)/../config/flightgoggles/flightgoggles_config.yaml" />
++	  <arg name="vins_path" default = "$(find feature_tracker)/../config/../" />
++    
++    <node name="feature_tracker" pkg="feature_tracker" type="feature_tracker" output="log">
++        <param name="config_file" type="string" value="$(arg config_path)" />
++        <param name="vins_folder" type="string" value="$(arg vins_path)" />
++    </node>
++
++    <node name="vins_estimator" pkg="vins_estimator" type="vins_estimator" output="screen">
++       <param name="config_file" type="string" value="$(arg config_path)" />
++       <param name="vins_folder" type="string" value="$(arg vins_path)" />
++    </node>
++
++    <node name="pose_graph" pkg="pose_graph" type="pose_graph" output="screen">
++        <param name="config_file" type="string" value="$(arg config_path)" />
++        <param name="visualization_shift_x" type="int" value="0" />
++        <param name="visualization_shift_y" type="int" value="0" />
++        <param name="skip_cnt" type="int" value="0" />
++        <param name="skip_dis" type="double" value="0" />
++    </node>
++
++</launch>
+diff --git a/vins_estimator/src/estimator_node.cpp b/vins_estimator/src/estimator_node.cpp
+index 1297936..8879498 100644
+--- a/vins_estimator/src/estimator_node.cpp
++++ b/vins_estimator/src/estimator_node.cpp
+@@ -155,7 +155,7 @@ void imu_callback(const sensor_msgs::ImuConstPtr &imu_msg)
+         std::lock_guard<std::mutex> lg(m_state);
+         predict(imu_msg);
+         std_msgs::Header header = imu_msg->header;
+-        header.frame_id = "world";
++        header.frame_id = "start";
+         if (estimator.solver_flag == Estimator::SolverFlag::NON_LINEAR)
+             pubLatestOdometry(tmp_P, tmp_Q, tmp_V, header);
+     }
+@@ -316,7 +316,7 @@ void process()
+             double whole_t = t_s.toc();
+             printStatistics(estimator, whole_t);
+             std_msgs::Header header = img_msg->header;
+-            header.frame_id = "world";
++            header.frame_id = "start";
+ 
+             pubOdometry(estimator, header);
+             pubKeyPoses(estimator, header);
+diff --git a/vins_estimator/src/utility/visualization.cpp b/vins_estimator/src/utility/visualization.cpp
+index 167e913..6d0780a 100644
+--- a/vins_estimator/src/utility/visualization.cpp
++++ b/vins_estimator/src/utility/visualization.cpp
+@@ -48,7 +48,7 @@ void pubLatestOdometry(const Eigen::Vector3d &P, const Eigen::Quaterniond &Q, co
+ 
+     nav_msgs::Odometry odometry;
+     odometry.header = header;
+-    odometry.header.frame_id = "world";
++    odometry.header.frame_id = "start";
+     odometry.pose.pose.position.x = P.x();
+     odometry.pose.pose.position.y = P.y();
+     odometry.pose.pose.position.z = P.z();
+@@ -109,8 +109,8 @@ void pubOdometry(const Estimator &estimator, const std_msgs::Header &header)
+     {
+         nav_msgs::Odometry odometry;
+         odometry.header = header;
+-        odometry.header.frame_id = "world";
+-        odometry.child_frame_id = "world";
++        odometry.header.frame_id = "start";
++        odometry.child_frame_id = "start";
+         Quaterniond tmp_Q;
+         tmp_Q = Quaterniond(estimator.Rs[WINDOW_SIZE]);
+         odometry.pose.pose.position.x = estimator.Ps[WINDOW_SIZE].x();
+@@ -127,10 +127,10 @@ void pubOdometry(const Estimator &estimator, const std_msgs::Header &header)
+ 
+         geometry_msgs::PoseStamped pose_stamped;
+         pose_stamped.header = header;
+-        pose_stamped.header.frame_id = "world";
++        pose_stamped.header.frame_id = "start";
+         pose_stamped.pose = odometry.pose.pose;
+         path.header = header;
+-        path.header.frame_id = "world";
++        path.header.frame_id = "start";
+         path.poses.push_back(pose_stamped);
+         pub_path.publish(path);
+ 
+@@ -149,7 +149,7 @@ void pubOdometry(const Estimator &estimator, const std_msgs::Header &header)
+ 
+         pose_stamped.pose = odometry.pose.pose;
+         relo_path.header = header;
+-        relo_path.header.frame_id = "world";
++        relo_path.header.frame_id = "start";
+         relo_path.poses.push_back(pose_stamped);
+         pub_relo_path.publish(relo_path);
+ 
+@@ -179,7 +179,7 @@ void pubKeyPoses(const Estimator &estimator, const std_msgs::Header &header)
+         return;
+     visualization_msgs::Marker key_poses;
+     key_poses.header = header;
+-    key_poses.header.frame_id = "world";
++    key_poses.header.frame_id = "start";
+     key_poses.ns = "key_poses";
+     key_poses.type = visualization_msgs::Marker::SPHERE_LIST;
+     key_poses.action = visualization_msgs::Marker::ADD;
+@@ -219,7 +219,7 @@ void pubCameraPose(const Estimator &estimator, const std_msgs::Header &header)
+ 
+         nav_msgs::Odometry odometry;
+         odometry.header = header;
+-        odometry.header.frame_id = "world";
++        odometry.header.frame_id = "start";
+         odometry.pose.pose.position.x = P.x();
+         odometry.pose.pose.position.y = P.y();
+         odometry.pose.pose.position.z = P.z();
+@@ -317,7 +317,7 @@ void pubTF(const Estimator &estimator, const std_msgs::Header &header)
+     q.setY(correct_q.y());
+     q.setZ(correct_q.z());
+     transform.setRotation(q);
+-    br.sendTransform(tf::StampedTransform(transform, header.stamp, "world", "body"));
++    br.sendTransform(tf::StampedTransform(transform, header.stamp, "start", "body"));
+ 
+     // camera frame
+     transform.setOrigin(tf::Vector3(estimator.tic[0].x(),
+@@ -332,7 +332,7 @@ void pubTF(const Estimator &estimator, const std_msgs::Header &header)
+ 
+     nav_msgs::Odometry odometry;
+     odometry.header = header;
+-    odometry.header.frame_id = "world";
++    odometry.header.frame_id = "start";
+     odometry.pose.pose.position.x = estimator.tic[0].x();
+     odometry.pose.pose.position.y = estimator.tic[0].y();
+     odometry.pose.pose.position.z = estimator.tic[0].z();
+@@ -357,7 +357,7 @@ void pubKeyframe(const Estimator &estimator)
+ 
+         nav_msgs::Odometry odometry;
+         odometry.header = estimator.Headers[WINDOW_SIZE - 2];
+-        odometry.header.frame_id = "world";
++        odometry.header.frame_id = "start";
+         odometry.pose.pose.position.x = P.x();
+         odometry.pose.pose.position.y = P.y();
+         odometry.pose.pose.position.z = P.z();
+@@ -407,7 +407,7 @@ void pubRelocalization(const Estimator &estimator)
+ {
+     nav_msgs::Odometry odometry;
+     odometry.header.stamp = ros::Time(estimator.relo_frame_stamp);
+-    odometry.header.frame_id = "world";
++    odometry.header.frame_id = "start";
+     odometry.pose.pose.position.x = estimator.relo_relative_t.x();
+     odometry.pose.pose.position.y = estimator.relo_relative_t.y();
+     odometry.pose.pose.position.z = estimator.relo_relative_t.z();
